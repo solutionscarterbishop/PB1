@@ -30,7 +30,8 @@ const supabase =
 const cache = new NodeCache({ stdTTL: 300 }); // 5 min
 
 // =====================
-// APP SETUP
+// APP 560
+
 // =====================
 const app = express();
 
@@ -556,13 +557,4 @@ app.get("/api/pdf/compare", async (req, res) => {
 // START
 app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
-});
-import dotenv from "dotenv";
-import express from "express";
-import cors from "cors";
-import rateLimit from "express-rate-limit";
-import NodeCache from "node-cache";
-import PDFDocument from "pdfkit";
-import { createClient } from "@supabase/supabase-js";
 
-dotenv.config();
