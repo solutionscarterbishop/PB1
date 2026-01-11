@@ -30,8 +30,7 @@ const supabase =
 const cache = new NodeCache({ stdTTL: 300 }); // 5 min
 
 // =====================
-// APP 560
-
+// APP SETUP
 // =====================
 const app = express();
 
@@ -328,6 +327,13 @@ app.get("/api/stores", async (req, res) => {
       rule: "standard",
       minReviews: 0
     });
+app.get("/api/debug/env", (req, res) => {
+  res.json({
+    hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
+    execWeeklyTable: process.env.EXEC_WEEKLY_TABLE,
+    defaultUsedIfMissing: !process.env.EXEC_WEEKLY_TABLE,
+  });
+});
 
     // Your frontend wants store objects with fields like market/state/city/place_name/store_id
     const stores = (summary.rows || []).map(r => ({
@@ -557,4 +563,5 @@ app.get("/api/pdf/compare", async (req, res) => {
 // START
 app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
+});
 
