@@ -34,8 +34,12 @@ const cache = new NodeCache({ stdTTL: 300 }); // 5 min
 // =====================
 const app = express();
 
+app.set("trust proxy", 1);
 // dev-friendly CORS (stop blocking yourself)
-app.use(cors({ origin: true }));
+app.use(cors({
+  origin: true,
+  credentials: false
+}));
 
 app.use(express.json({ limit: "2mb" }));
 
@@ -553,5 +557,12 @@ app.get("/api/pdf/compare", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
 });
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import NodeCache from "node-cache";
+import PDFDocument from "pdfkit";
+import { createClient } from "@supabase/supabase-js";
 
-
+dotenv.config();
