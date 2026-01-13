@@ -1,567 +1,439 @@
-import dotenv from "dotenv";
-dotenv.config();
+console.log("✅ SERVER FILE:", new URL(import.meta.url).pathname);
+console.log("✅ PID:", process.pid);
 
 import express from "express";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
-import NodeCache from "node-cache";
-import PDFDocument from "pdfkit";
+import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
-// =====================
-// ENV + CONFIG
-// =====================
-const PORT = Number(process.env.PORT || 10000);
-const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
-const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
-const EXEC_WEEKLY_TABLE = (process.env.EXEC_WEEKLY_TABLE || "weekly_rollups").trim();
+dotenv.config();
 
-const SCHEMA_VERSION = 1;
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.set("etag", false);
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn("⚠️ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
+  console.error("⚠️ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
 }
 
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
-const cache = new NodeCache({ stdTTL: 300 }); // 5 min
+app.use(cors());
+app.use(express.json());
 
-// =====================
-// APP SETUP
-// =====================
-const app = express();
-
-app.set("trust proxy", 1);
-// dev-friendly CORS (stop blocking yourself)
-app.use(cors({
-  origin: true,
-  credentials: false
-}));
-
-app.use(express.json({ limit: "2mb" }));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300
+// Prevent caching on API routes (avoid 304/body issues)
+app.use("/api", function (_req, res, next) {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate"
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
 });
-app.use("/api/", limiter);
 
-// =====================
-// HELPERS
-// =====================
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+// Health endpoints
+app.get("/health", function (_req, res) {
+  res.json({ ok: true });
+});
+app.get("/api/health", function (_req, res) {
+  res.json({ ok: true });
+});
 
-function parseRule(rule) {
-  if (rule === "conservative") return { avgMin: 3.4, negMax: 30, deltaMin: -0.15 };
-  if (rule === "aggressive") return { avgMin: 3.8, negMax: 20, deltaMin: -0.10 };
-  return { avgMin: 3.6, negMax: 25, deltaMin: -0.15 }; // standard
-}
-
-function toPct(x) {
-  if (!Number.isFinite(x)) return null;
-  return x * 100;
-}
-
-function confFromVol(vol30d) {
-  if (!Number.isFinite(vol30d)) return "Low";
-  if (vol30d >= 50) return "High";
-  if (vol30d >= 15) return "Medium";
-  return "Low";
-}
-
-function statusFrom(row, ruleCfg) {
-  const avg = row.avg30d;
-  const neg = row.negPct30d;
-  const delta = row.deltaWk;
-
-  const reasons = [];
-  if (avg != null && avg < ruleCfg.avgMin) reasons.push(`avg<${ruleCfg.avgMin}`);
-  if (neg != null && neg >= ruleCfg.negMax) reasons.push(`neg%≥${ruleCfg.negMax}`);
-  if (delta != null && delta <= ruleCfg.deltaMin) reasons.push(`Δwk≤${ruleCfg.deltaMin}`);
-
-  if (reasons.length >= 2) return { status: "At Risk", reason: reasons.join(" + ") };
-  if (reasons.length === 1) return { status: "Watch", reason: reasons[0] };
-  return { status: "Stable", reason: "within thresholds" };
-}
-
-// Pull last N weeks of weekly_rollups
-async function getWeeklyRows({ limit = 10000 } = {}) {
-  if (!supabase) throw new Error("Supabase not configured.");
-
-  const cacheKey = `weekly:${limit}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
-
-  const { data, error } = await supabase
-    .from(EXEC_WEEKLY_TABLE)
-    .select("*")
-    .order("week_ending", { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(`Supabase select failed: ${error.message || JSON.stringify(error)}`);
-
-  const rows = data || [];
-  cache.set(cacheKey, rows);
-  return rows;
-}
-
-function lastNUniqueWeeks(rows, n) {
-  const weeks = [];
-  for (const r of rows) {
-    if (r.week_ending && !weeks.includes(r.week_ending)) weeks.push(r.week_ending);
-    if (weeks.length >= n) break;
-  }
-  return weeks;
-}
-
-function groupBy(rows, keyFn) {
-  const m = new Map();
-  for (const r of rows) {
-    const k = keyFn(r);
-    if (!m.has(k)) m.set(k, []);
-    m.get(k).push(r);
-  }
-  return m;
-}
-
-function normalizeStoreId(r) {
-  // prefer store_id; fallback to store_name|state
-  const sid = r.store_id || r.storeid || r.store || null;
-  if (sid) return String(sid);
-  const name = (r.store_name || r.store || r.location || "unknown").toString().trim();
-  const st = (r.state || "").toString().trim();
-  return `${name}__${st}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-}
-
-function pickName(r) {
-  return (r.store_name || r.store || r.location || r.name || "Unknown Store").toString();
-}
-
-function pickMarket(r) {
-  return (r.market || r.region || r.city || "Unknown").toString();
-}
-
-// Build “store summary row” used by your frontend
-function buildStoreSummary({ store_id, name, market, state, rowsForStore, windowWeeks, ruleCfg }) {
-  // rowsForStore are sorted desc by week_ending (because global fetch is desc)
-  // Compute over windowWeeks (N weeks)
-  const byWeek = groupBy(rowsForStore, (r) => r.week_ending);
-  const weeks = windowWeeks.filter((w) => byWeek.has(w));
-
-  const windowRows = weeks.map((w) => byWeek.get(w)[0]).filter(Boolean); // 1 row per week
-  const latest = windowRows[0] || null;
-  const prev = windowRows[1] || null;
-
-  // avg30d = avg of last 4 weeks; avg7d = latest week avg
-  const avg7d = latest ? Number(latest.avg_rating ?? latest.avg ?? latest.rating ?? null) : null;
-  const avg30d =
-    windowRows.length
-      ? windowRows.slice(0, 4).reduce((s, r) => s + Number(r.avg_rating ?? r.avg ?? r.rating ?? 0), 0) /
-        clamp(Math.min(4, windowRows.length), 1, 999)
-      : null;
-
-  const deltaWk =
-    latest && prev
-      ? Number(avg7d) - Number(prev.avg_rating ?? prev.avg ?? prev.rating ?? 0)
-      : null;
-
-  const totalLatest = latest ? Number(latest.total_reviews ?? latest.total ?? 0) : 0;
-  const lowLatest = latest ? Number(latest.low_reviews ?? latest.low ?? 0) : 0;
-
-  const vol30d = windowRows.slice(0, 4).reduce((s, r) => s + Number(r.total_reviews ?? r.total ?? 0), 0);
-  const negPct30d = vol30d > 0
-    ? toPct(windowRows.slice(0, 4).reduce((s, r) => s + Number(r.low_reviews ?? r.low ?? 0), 0) / vol30d)
-    : null;
-
-  const flag = statusFrom({ avg30d, negPct30d, deltaWk }, ruleCfg);
-  const confidence = confFromVol(vol30d);
-
-  return {
-    store_id,
-    place_name: name,
-    address: "",
-    city: "",
-    state: state || "",
-    market: market || "Unknown",
-    avg30d: Number.isFinite(avg30d) ? Number(avg30d.toFixed(2)) : null,
-    avg7d: Number.isFinite(avg7d) ? Number(avg7d.toFixed(2)) : null,
-    deltaWk: Number.isFinite(deltaWk) ? Number(deltaWk.toFixed(2)) : null,
-    negPct30d: Number.isFinite(negPct30d) ? Number(negPct30d.toFixed(1)) : 0,
-    vol30d: vol30d || 0,
-    topIssue: "—",
-    topPraise: "—",
-    status: flag.status,
-    confidence,
-    reason: flag.reason
-  };
-}
-
-async function computeSummaryAndMetrics({ window = "30d", rule = "standard", minReviews = 8, market, state, city, q, sort }) {
-  const ruleCfg = parseRule(rule);
-
-  const all = await getWeeklyRows({ limit: 10000 });
-
-  // interpret window as weeks (7d=1, 14d=2, 30d=4, 90d=12)
-  const windowWeeksN =
-    window === "7d" ? 1 : window === "14d" ? 2 : window === "90d" ? 12 : 4;
-
-  const uniqWeeks = lastNUniqueWeeks(all, Math.max(windowWeeksN, 12));
-  const storeGroups = groupBy(all, (r) => normalizeStoreId(r));
-
-  // build store rows
-  let rows = [];
-  for (const [store_id, storeRows] of storeGroups.entries()) {
-    const r0 = storeRows[0];
-    const name = pickName(r0);
-    const mk = pickMarket(r0);
-    const st = (r0.state || "").toString();
-
-    const sumRow = buildStoreSummary({
-      store_id,
-      name,
-      market: mk,
-      state: st,
-      rowsForStore: storeRows,
-      windowWeeks: uniqWeeks.slice(0, windowWeeksN),
-      ruleCfg
+function requireSupabase(res) {
+  if (!supabase) {
+    res.status(500).json({
+      error:
+        "Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env",
     });
-
-    // enforce minReviews based on vol30d (proxy)
-    if ((sumRow.vol30d || 0) < Number(minReviews || 0)) continue;
-
-    rows.push(sumRow);
+    return false;
   }
+  return true;
+}
 
-  // filtering
-  if (market) rows = rows.filter(r => r.market === market);
-  if (state) rows = rows.filter(r => r.state === state);
-  if (city) rows = rows.filter(r => (r.city || "") === city);
-  if (q) {
-    const qq = String(q).toLowerCase();
-    rows = rows.filter(r =>
-      (r.place_name || "").toLowerCase().includes(qq) ||
-      (r.market || "").toLowerCase().includes(qq) ||
-      (r.state || "").toLowerCase().includes(qq)
-    );
-  }
+/**
+ * /api/exec-weekly
+ * MUST match frontend expectations:
+ * {
+ *   summary: {...},
+ *   stores: [...],
+ *   weekly: [...]
+ * }
+ */
+app.get("/api/exec-weekly", async function (_req, res) {
+  try {
+    if (!requireSupabase(res)) return;
 
-  // sorting
-  if (sort === "rating_low") rows.sort((a,b) => (a.avg30d ?? 9) - (b.avg30d ?? 9));
-  else if (sort === "rating_high") rows.sort((a,b) => (b.avg30d ?? 0) - (a.avg30d ?? 0));
-  else if (sort === "delta_down") rows.sort((a,b) => (a.deltaWk ?? 9) - (b.deltaWk ?? 9));
-  else if (sort === "neg_high") rows.sort((a,b) => (b.negPct30d ?? 0) - (a.negPct30d ?? 0));
-  else if (sort === "vol_high") rows.sort((a,b) => (b.vol30d ?? 0) - (a.vol30d ?? 0));
-  else {
-    // atrisk default: At Risk first, then worst avg
-    const rank = (s) => (s === "At Risk" ? 0 : s === "Watch" ? 1 : 2);
-    rows.sort((a,b) => (rank(a.status)-rank(b.status)) || ((a.avg30d ?? 9) - (b.avg30d ?? 9)));
-  }
+    // Pull weekly rollup rows from your view
+    const weeklyQ = await supabase
+      .from("exec_weekly")
+      .select("*")
+      .order("week_ending", { ascending: false });
 
-  // metrics (weighted brand avg by vol30d)
-  const totalVol = rows.reduce((s, r) => s + (r.vol30d || 0), 0);
-  const brandAvg =
-    totalVol > 0
-      ? rows.reduce((s, r) => s + (r.avg30d != null ? r.avg30d * (r.vol30d || 0) : 0), 0) / totalVol
-      : null;
+    if (weeklyQ.error) return res.status(500).json({ error: weeklyQ.error.message });
 
-  const negativePct =
-    totalVol > 0
-      ? rows.reduce((s, r) => s + ((r.negPct30d || 0) / 100) * (r.vol30d || 0), 0) / totalVol * 100
-      : 0;
+    const rows = weeklyQ.data || [];
 
-  const storesAtRiskCount = rows.filter(r => r.status === "At Risk").length;
-  const worstMoverCount = rows.filter(r => (r.deltaWk ?? 0) < 0).length;
-
-  const now = new Date().toISOString();
-
-  return {
-    summary: { rows },
-    metrics: {
-      schemaVersion: SCHEMA_VERSION,
-      lastRefreshed: now,
-      window,
-      rule,
-      minReviews: Number(minReviews),
-      brandAvg: brandAvg != null ? Number(brandAvg.toFixed(2)) : null,
-      negativePct: Number(negativePct.toFixed(1)),
-      reviewVolume7d: rows.reduce((s, r) => s + (r.vol30d || 0), 0), // proxy
-      storesAtRiskCount,
-      drivers: {
-        topComplaintTag: "—",
-        topPraiseTag: "—",
-        worstMoverCount
-      },
-      definitions: {
-        brandAvg: "Weighted average rating across stores in scope (proxy from weekly rollups).",
-        deltaWk: "Δwk = latest week avg rating minus prior week."
+    // Build stores list from rows (guarantees Stores table populates)
+    const storeMap = new Map();
+    for (const r of rows) {
+      const k = String(r.store_id);
+      if (!storeMap.has(k)) {
+        storeMap.set(k, {
+          store_id: r.store_id,
+          place_name: r.place_name,
+          address: "",
+          city: "",
+          state: r.state || "",
+        });
       }
     }
-  };
+    const stores = Array.from(storeMap.values());
+
+    // Compute total_reviews_delta per store (week-over-week)
+    const byStore = new Map();
+    for (const r of rows) {
+      const sid = String(r.store_id);
+      if (!byStore.has(sid)) byStore.set(sid, []);
+      byStore.get(sid).push(r);
+    }
+    for (const arr of byStore.values()) {
+      arr.sort(function (a, b) {
+        return String(a.week_ending).localeCompare(String(b.week_ending));
+      });
+    }
+
+    // Transform rows -> weekly with EXACT keys frontend expects
+    const weekly = [];
+    for (const entry of byStore.entries()) {
+      const arr = entry[1];
+      let prevTotal = null;
+
+      for (const r of arr) {
+        const total = Number(r.total_reviews || 0);
+        const totalDelta = prevTotal === null ? null : total - prevTotal;
+        prevTotal = total;
+
+        weekly.push({
+          week_ending: r.week_ending,
+          store_id: r.store_id,
+          place_name: r.place_name,
+          city: "", // not available yet
+          state: r.state || "",
+
+          total_reviews: r.total_reviews == null ? null : r.total_reviews,
+          avg_stars: r.avg_rating == null ? null : r.avg_rating,
+
+          positive_reviews: null,
+          negative_reviews: null,
+
+          avg_stars_delta: r.rating_change == null ? null : r.rating_change,
+          total_reviews_delta: totalDelta,
+        });
+      }
+    }
+
+    // newest first
+    weekly.sort(function (a, b) {
+      return String(b.week_ending).localeCompare(String(a.week_ending));
+    });
+
+    // Summary KPIs from latest week only
+    const latestWeekEnding = weekly.length ? weekly[0].week_ending : null;
+    const latestWeekRows = latestWeekEnding
+      ? weekly.filter(function (r) {
+          return r.week_ending === latestWeekEnding;
+        })
+      : [];
+
+    const storeSet = new Set();
+    for (const r of latestWeekRows) storeSet.add(String(r.store_id));
+
+    let total_reviews = 0;
+    for (const r of latestWeekRows) total_reviews += Number(r.total_reviews) || 0;
+
+    let avg_stars_overall = null;
+    if (latestWeekRows.length) {
+      let sum = 0;
+      let count = 0;
+      for (const r of latestWeekRows) {
+        const x = Number(r.avg_stars);
+        if (Number.isFinite(x)) {
+          sum += x;
+          count += 1;
+        }
+      }
+      avg_stars_overall = count ? sum / count : null;
+    }
+
+    const summary = {
+      week_ending: latestWeekEnding,
+      stores_reporting: storeSet.size,
+      total_reviews: total_reviews,
+      avg_stars_overall: avg_stars_overall,
+      positive_reviews: null,
+      negative_reviews: null,
+    };
+
+    return res.json({
+      __signature: "EXEC_WEEKLY_V2_SHAPE",
+      summary: summary,
+      stores: stores,
+      weekly: weekly,
+      rows: rows, // debug / safe to keep for now
+    });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+/**
+ * Stores list (optional helper endpoint)
+ */
+app.get("/api/stores", async function (_req, res) {
+  try {
+    if (!requireSupabase(res)) return;
+
+    const q = await supabase
+      .from("stores")
+      .select("store_id, place_name, address, city, state")
+      .order("place_name", { ascending: true });
+
+    if (q.error) return res.status(500).json({ error: q.error.message });
+
+    const rows = q.data || [];
+    return res.json({ rows: rows, stores: rows });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+/**
+ * Store detail + last 100 reviews (optional helper endpoint)
+ */
+app.get("/api/store/:store_id", async function (req, res) {
+  try {
+    if (!requireSupabase(res)) return;
+
+    const store_id = req.params.store_id;
+
+    const storeQ = await supabase
+      .from("stores")
+      .select("*")
+      .eq("store_id", store_id)
+      .maybeSingle();
+
+    if (storeQ.error) return res.status(500).json({ error: storeQ.error.message });
+
+    const reviewsQ = await supabase
+      .from("reviews")
+      .select(
+        "review_date, rating, stars, review_name, review_text, review_url, likes, complaint_match, positive_match"
+      )
+      .eq("store_id", store_id)
+      .order("review_date", { ascending: false })
+      .limit(100);
+
+    if (reviewsQ.error) return res.status(500).json({ error: reviewsQ.error.message });
+
+    return res.json({
+      store: storeQ.data || null,
+      reviews: reviewsQ.data || [],
+    });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// -----------------------------
+// UI COMPAT ROUTES (PATCH)
+// Adds /api/metrics and /api/stores/summary expected by frontend
+// Works by computing from your existing /api/exec-weekly payload
+// -----------------------------
+
+function qStr(req, key, def) {
+  const v = req.query?.[key];
+  if (v === undefined || v === null || v === "") return def;
+  return String(v);
+}
+function qNum(req, key, def) {
+  const v = Number(req.query?.[key]);
+  return Number.isFinite(v) ? v : def;
+}
+function safePct(n, d) {
+  if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return 0;
+  return (n / d) * 100;
 }
 
-// =====================
-// ROUTES
-// =====================
-app.get("/", (req, res) => res.send("pb1 backend running"));
+function computeFromExecWeekly(execWeekly, { window = "30d", rule = "standard", minReviews = 8 } = {}) {
+  const rows = Array.isArray(execWeekly?.rows) ? execWeekly.rows : [];
+  const stores = Array.isArray(execWeekly?.stores) ? execWeekly.stores : [];
 
-app.get("/api/health", async (req, res) => {
-  try {
-    res.json({
-      ok: true,
-      now: new Date().toISOString(),
-      schemaVersion: SCHEMA_VERSION
-    });
-  } catch (e) {
-    res.status(500).json({ ok: false, schemaVersion: SCHEMA_VERSION, error: String(e?.message || e) });
-  }
-});
+  const weekSet = [...new Set(rows.map(r => r.week_ending).filter(Boolean))].sort();
+  const latestWeek = weekSet[weekSet.length - 1] || null;
 
-// Frontend expects /api/stores => ARRAY of stores
-app.get("/api/stores", async (req, res) => {
-  try {
-    const { summary } = await computeSummaryAndMetrics({
-      window: "30d",
-      rule: "standard",
-      minReviews: 0
-    });
-app.get("/api/debug/env", (req, res) => {
-  res.json({
-    hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
-    execWeeklyTable: process.env.EXEC_WEEKLY_TABLE,
-    defaultUsedIfMissing: !process.env.EXEC_WEEKLY_TABLE,
+  const latestRows = latestWeek ? rows.filter(r => r.week_ending === latestWeek) : [];
+
+  const thresholds =
+    rule === "conservative" ? { rating: 3.4, negPct: 30, delta: -0.15 } :
+    rule === "aggressive"   ? { rating: 3.8, negPct: 20, delta: -0.10 } :
+                              { rating: 3.6, negPct: 25, delta: -0.15 };
+
+  const avgStars = execWeekly?.summary?.avg_stars_overall;
+  const totalReviews = execWeekly?.summary?.total_reviews;
+
+  const positive = execWeekly?.summary?.positive_reviews;
+  const negative = execWeekly?.summary?.negative_reviews;
+
+  const negPct = (negative != null && totalReviews != null)
+    ? safePct(Number(negative), Number(totalReviews))
+    : 0;
+
+  const summaryRows = latestRows.map(r => {
+    const vol30d = Number(r.total_reviews ?? 0);
+    const avg30d = (r.avg_rating ?? r.avg_stars ?? null);
+    const avg7d = avg30d; // until you have real 7d rollups
+    const deltaWk = r.rating_change ?? r.avg_stars_delta ?? null;
+
+    const negPct30d = (r.negative_reviews != null && vol30d)
+      ? safePct(Number(r.negative_reviews), vol30d)
+      : 0;
+
+    const status =
+      (avg30d != null && avg30d < thresholds.rating && vol30d >= minReviews) ||
+      (negPct30d >= thresholds.negPct && vol30d >= minReviews) ||
+      (deltaWk != null && deltaWk <= thresholds.delta && vol30d >= minReviews)
+        ? "At Risk"
+        : "Stable";
+
+    const s = stores.find(x => String(x.store_id) === String(r.store_id));
+
+    return {
+      store_id: String(r.store_id),
+      place_name: r.place_name || s?.place_name || "Unknown",
+      address: r.address || s?.address || "",
+      city: r.city || s?.city || "",
+      state: r.state || s?.state || "",
+      market: r.market || r.state || s?.state || "Unknown",
+
+      avg30d,
+      avg7d,
+      deltaWk,
+      negPct30d,
+      vol30d,
+
+      topIssue: r.top_issue || "—",
+      topPraise: r.top_praise || "—",
+      confidence: vol30d >= minReviews ? "High" : "Low",
+      reason: vol30d >= minReviews ? "Sufficient volume" : "Insufficient volume",
+      status
+    };
   });
-});
 
-    // Your frontend wants store objects with fields like market/state/city/place_name/store_id
-    const stores = (summary.rows || []).map(r => ({
-      store_id: r.store_id,
-      place_name: r.place_name,
-      address: r.address,
-      city: r.city,
-      state: r.state,
-      market: r.market
-    }));
+  const storesAtRiskCount = summaryRows.filter(x => x.status === "At Risk").length;
 
-    res.json(stores);
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
-});
+  const drivers = {
+    topComplaintTag: "—",
+    topPraiseTag: "—",
+    worstMoverCount: summaryRows.filter(r => (r.deltaWk ?? 0) < 0).length
+  };
+
+  const metrics = {
+    window,
+    rule,
+    minReviews,
+    lastRefreshed: new Date().toISOString(),
+    brandAvg: (avgStars != null ? Number(avgStars) : null),
+    negativePct: negPct,
+    reviewVolume7d: totalReviews ?? null,
+    storesAtRiskCount,
+    drivers,
+    definitions: {
+      brandAvg: "Average star rating across stores in scope.",
+      deltaWk: "Week-over-week rating change."
+    }
+  };
+
+  return { metrics, summary: { rows: summaryRows } };
+}
+
+// Fetch exec-weekly using node's built-in fetch (Node 18+ / Node 22 ok)
+async function getExecWeeklyLocal(PORT) {
+  const res = await fetch(`http://localhost:${PORT}/api/exec-weekly`, {
+    headers: { "Accept": "application/json" }
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`exec-weekly ${res.status}: ${text}`);
+  try { return JSON.parse(text); } catch { throw new Error(`exec-weekly returned non-JSON: ${text.slice(0,200)}`); }
+}
 
 app.get("/api/metrics", async (req, res) => {
   try {
-    const out = await computeSummaryAndMetrics({
-      window: (req.query.window || "30d").toString(),
-      rule: (req.query.rule || "standard").toString(),
-      minReviews: Number(req.query.minReviews || 8),
-      market: (req.query.market || "").toString() || undefined,
-      state: (req.query.state || "").toString() || undefined,
-      city: (req.query.city || "").toString() || undefined,
-      q: (req.query.q || "").toString() || undefined,
-      sort: (req.query.sort || "").toString() || undefined
-    });
+    const window = qStr(req, "window", "30d");
+    const rule = qStr(req, "rule", "standard");
+    const minReviews = qNum(req, "minReviews", 8);
 
-    res.json(out.metrics);
+    const execWeekly = await getExecWeeklyLocal(PORT);
+    const { metrics } = computeFromExecWeekly(execWeekly, { window, rule, minReviews });
+
+    res.json(metrics);
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+    console.error("metrics error:", e);
+    res.status(500).json({ error: "metrics_failed", detail: String(e?.message || e) });
   }
 });
 
 app.get("/api/stores/summary", async (req, res) => {
   try {
-    const out = await computeSummaryAndMetrics({
-      window: (req.query.window || "30d").toString(),
-      rule: (req.query.rule || "standard").toString(),
-      minReviews: Number(req.query.minReviews || 8),
-      market: (req.query.market || "").toString() || undefined,
-      state: (req.query.state || "").toString() || undefined,
-      city: (req.query.city || "").toString() || undefined,
-      q: (req.query.q || "").toString() || undefined,
-      sort: (req.query.sort || "").toString() || undefined
-    });
+    const window = qStr(req, "window", "30d");
+    const rule = qStr(req, "rule", "standard");
+    const minReviews = qNum(req, "minReviews", 8);
 
-    res.json(out.summary);
+    const execWeekly = await getExecWeeklyLocal(PORT);
+    const { summary } = computeFromExecWeekly(execWeekly, { window, rule, minReviews });
+
+    res.json(summary);
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+    console.error("summary error:", e);
+    res.status(500).json({ error: "summary_failed", detail: String(e?.message || e) });
   }
 });
 
-// Store detail used by your modal: /api/store/:id
-app.get("/api/store/:id", async (req, res) => {
+setTimeout(() => {
+  console.log("✅ ROUTES REGISTERED:");
+  app._router.stack
+    .filter(r => r.route)
+    .forEach(r =>
+      console.log(
+        Object.keys(r.route.methods).join(",").toUpperCase(),
+        r.route.path
+      )
+    );
+}, 200);
+
+app.get("/api/exec-weekly", async (_req, res) => {
   try {
-    const store_id = req.params.id;
-    const window = (req.query.window || "30d").toString();
-    const rule = (req.query.rule || "standard").toString();
-    const minReviews = Number(req.query.minReviews || 8);
-    const ruleCfg = parseRule(rule);
+    if (!supabase) return res.status(500).json({ error: "Supabase client not initialized (missing env vars)" });
 
-    const all = await getWeeklyRows({ limit: 10000 });
-    const storeRows = all.filter(r => normalizeStoreId(r) === store_id);
+    const { data, error } = await supabase
+      .from("exec_weekly")
+      .select("*");
 
-    if (!storeRows.length) {
-      return res.status(404).json({ ok: false, error: "Store not found in weekly rollups." });
-    }
-
-    const windowWeeksN = window === "7d" ? 1 : window === "14d" ? 2 : window === "90d" ? 12 : 4;
-    const uniqWeeks = lastNUniqueWeeks(all, Math.max(windowWeeksN, 12));
-    const weeks = uniqWeeks.slice(0, 12);
-
-    // build trends arrays
-    const byWeek = groupBy(storeRows, (r) => r.week_ending);
-    const avgRatingByWeek = weeks.map(w => {
-      const row = byWeek.get(w)?.[0];
-      const v = row ? Number(row.avg_rating ?? row.avg ?? row.rating ?? null) : null;
-      return Number.isFinite(v) ? Number(v.toFixed(2)) : null;
-    });
-
-    // compute summary kpis
-    const summaryRow = buildStoreSummary({
-      store_id,
-      name: pickName(storeRows[0]),
-      market: pickMarket(storeRows[0]),
-      state: (storeRows[0].state || "").toString(),
-      rowsForStore: storeRows,
-      windowWeeks: uniqWeeks.slice(0, windowWeeksN),
-      ruleCfg
-    });
-
-    if ((summaryRow.vol30d || 0) < minReviews) {
-      // still return, but note confidence
-      summaryRow.confidence = "Low";
-    }
-
-    const flag = statusFrom(summaryRow, ruleCfg);
-
-    res.json({
-      ok: true,
-      lastRefreshed: new Date().toISOString(),
-      window,
-      rule,
-      minReviews,
-      confidence: summaryRow.confidence,
-      store: {
-        store_id,
-        place_name: summaryRow.place_name,
-        market: summaryRow.market,
-        state: summaryRow.state
-      },
-      kpis: {
-        avg7d: summaryRow.avg7d,
-        avg30d: summaryRow.avg30d,
-        deltaWk: summaryRow.deltaWk,
-        neg7d: null,
-        neg30d: summaryRow.negPct30d,
-        vol7d: null,
-        vol30d: summaryRow.vol30d
-      },
-      trends: {
-        weeks,
-        avgRatingByWeek
-      },
-      themes: {
-        complaints: [],
-        praise: [],
-        newThisWeek: []
-      },
-      actionChecklist: [
-        { title: "Validate excerpts", rationale: `Status=${flag.status}. Confirm drivers before action.` },
-        { title: "Ops check", rationale: "Spot-check speed/CA/cleanliness on next manager visit." },
-        { title: "Close the loop", rationale: "Track next week’s avg + volume to confirm rebound." }
-      ],
-      recentNegative: [],
-      recentPositive: [],
-      rawLinks: {
-        googleSearchUrl: `https://www.google.com/search?q=${encodeURIComponent(summaryRow.place_name + " " + (summaryRow.state || ""))}`
-      }
-    });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data ?? []);
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+    return res.status(500).json({ error: String(e) });
   }
 });
 
-// Compare endpoint: your frontend calls /api/compare?ids=...
-app.get("/api/compare", async (req, res) => {
-  try {
-    const ids = (req.query.ids || "").toString().split(",").map(s => s.trim()).filter(Boolean);
-    const window = (req.query.window || "30d").toString();
-    const rule = (req.query.rule || "standard").toString();
-    const minReviews = Number(req.query.minReviews || 8);
 
-    if (ids.length < 2) return res.status(400).json({ ok: false, error: "Need at least 2 ids." });
-
-    // build store objects by calling store detail builder quickly
-    const all = await getWeeklyRows({ limit: 10000 });
-    const windowWeeksN = window === "7d" ? 1 : window === "14d" ? 2 : window === "90d" ? 12 : 4;
-    const uniqWeeks = lastNUniqueWeeks(all, Math.max(windowWeeksN, 12));
-    const ruleCfg = parseRule(rule);
-
-    const stores = [];
-    for (const store_id of ids.slice(0, 6)) {
-      const storeRows = all.filter(r => normalizeStoreId(r) === store_id);
-      if (!storeRows.length) continue;
-
-      const summaryRow = buildStoreSummary({
-        store_id,
-        name: pickName(storeRows[0]),
-        market: pickMarket(storeRows[0]),
-        state: (storeRows[0].state || "").toString(),
-        rowsForStore: storeRows,
-        windowWeeks: uniqWeeks.slice(0, windowWeeksN),
-        ruleCfg
-      });
-
-      if ((summaryRow.vol30d || 0) < minReviews) summaryRow.confidence = "Low";
-
-      // trends
-      const byWeek = groupBy(storeRows, (r) => r.week_ending);
-      const weeks = uniqWeeks.slice(0, 12);
-      const avgRatingByWeek = weeks.map(w => {
-        const row = byWeek.get(w)?.[0];
-        const v = row ? Number(row.avg_rating ?? row.avg ?? row.rating ?? null) : null;
-        return Number.isFinite(v) ? Number(v.toFixed(2)) : null;
-      });
-
-      stores.push({
-        ...summaryRow,
-        trends: { weeks, avgRatingByWeek }
-      });
-    }
-
-    res.json({
-      ok: true,
-      stores,
-      themeList: [],
-      drilldown: { byTheme: {} }
-    });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
+app.listen(PORT, function () {
+  console.log("pb1 backend running on http://localhost:" + PORT);
 });
-
-// PDF endpoints your UI tries to open (basic working placeholder)
-app.get("/api/pdf/compare", async (req, res) => {
-  try {
-    res.setHeader("Content-Type", "application/pdf");
-    const doc = new PDFDocument({ margin: 48 });
-    doc.pipe(res);
-
-    doc.fontSize(18).text("Executive Brief (MVP)", { underline: true });
-    doc.moveDown();
-    doc.fontSize(11).text(`Generated: ${new Date().toLocaleString()}`);
-    doc.moveDown();
-    doc.text("PDF export is wired. Next step: populate with real executive summary + store tables.");
-
-    doc.end();
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
-});
-
-// START
-app.listen(PORT, () => {
-  console.log(`pb1 backend running on http://localhost:${PORT}`);
-});
-
