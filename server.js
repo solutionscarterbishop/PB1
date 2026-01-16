@@ -221,7 +221,12 @@ app.get("/api/stores", async (_req, res) => {
   try {
     if (!requireSupabase(res)) return;
 
-    const { data, error } = await supabase.from(CFG.STORES_UNIQUE).select("*").limit(10000);
+    const { data, error } = await supabase
+  .from("stores")
+  .select("*")
+  .order("created_at", { ascending: false })
+  .limit(10000);
+
     if (error) throw error;
 
     const rows = (data ?? []).map(normalizeStoreRow);
