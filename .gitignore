@@ -2,3 +2,10 @@ node_modules
 .env
 .Ds_store
 dist
+
+# local artifacts / backups
+node
+potbelly-exec-backend@1.0.0
+frontend/index.backup.html
+*.backup.html
+.DS_Store
