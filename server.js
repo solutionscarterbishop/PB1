@@ -8,6 +8,9 @@
 // Env required:
 //   SUPABASE_URL=...
 //   SUPABASE_SERVICE_ROLE_KEY=...
+//
+// Optional (recommended):
+//   INGEST_TOKEN=some-long-random-string
 
 import express from "express";
 import cors from "cors";
@@ -45,14 +48,15 @@ const supabase =
 
 // ---------- Config ----------
 const CFG = {
-  // NOTE: stores_unique is NOT required anymore for /api/stores (we derive from exec_weekly)
   STORES_UNIQUE: "stores_unique",
   REVIEWS: "reviews",
   EXEC_WEEKLY: "exec_weekly",
   RPC_REFRESH: "refresh_exec_weekly_rollup",
+
+  // NEW: raw ingest event store
+  INGEST_EVENTS: "ingest_events",
 };
 
-// ---------- Helpers ----------
 function requireSupabase(res) {
   if (!supabase) {
     res.status(500).json({
@@ -67,18 +71,37 @@ function requireSupabase(res) {
 function norm(v) {
   return (v ?? "").toString().trim();
 }
-
 function toInt(v, def = 0) {
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
 }
-
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
-
 function sha1(s) {
   return crypto.createHash("sha1").update(String(s)).digest("hex");
+}
+
+function normalizeStoreRow(r) {
+  const store_name =
+    r.store_name ??
+    r.place_name ??
+    r.name ??
+    r.location_name ??
+    r.store ??
+    r.title ??
+    "Unknown Store";
+
+  const store_id = r.store_id ?? r.id ?? r.uuid ?? r.store_uuid ?? null;
+
+  return {
+    ...r,
+    store_id,
+    store_name,
+    city: r.city ?? null,
+    state: r.state ?? null,
+    address: r.address ?? null,
+  };
 }
 
 function normalizeReviewRow(r) {
@@ -103,39 +126,46 @@ async function refreshRollupsSafe() {
   throw r.error;
 }
 
+// ---------- Security helper ----------
+function requireIngestToken(req, res) {
+  const expected = process.env.INGEST_TOKEN;
+  if (!expected) {
+    res.status(500).json({
+      ok: false,
+      error: "Server missing INGEST_TOKEN in env (set it locally + on Render).",
+    });
+    return false;
+  }
+  const got = req.headers["x-ingest-token"];
+  if (!got || got !== expected) {
+    res.status(401).json({ ok: false, error: "Unauthorized (bad ingest token)" });
+    return false;
+  }
+  return true;
+}
+
 // ---------- health ----------
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-// ---------- debug (safe) ----------
-app.get("/api/debug/env", (_req, res) => {
-  res.json({
-    ok: true,
-    has_SUPABASE_URL: !!process.env.SUPABASE_URL,
-    has_SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    node_env: process.env.NODE_ENV || null,
-    now: new Date().toISOString(),
-  });
-});
-
-// Optional: lightweight connectivity check against known tables/views
+// ---------- debug ----------
 app.get("/api/debug", async (_req, res) => {
   try {
     if (!supabase) {
       return res.json({ ok: false, error: "missing env vars", now: new Date().toISOString() });
     }
 
-    const ew = await supabase.from(CFG.EXEC_WEEKLY).select("store_id", { count: "exact", head: true });
-    const rv = await supabase.from(CFG.REVIEWS).select("id", { count: "exact", head: true });
+    const s = await supabase.from("stores").select("id", { count: "exact", head: true });
+    const r = await supabase.from(CFG.REVIEWS).select("id", { count: "exact", head: true });
+    const ie = await supabase.from(CFG.INGEST_EVENTS).select("id", { count: "exact", head: true });
 
     res.json({
       ok: true,
-      exec_weekly_count: ew.error ? null : ew.count ?? null,
-      reviews_count: rv.error ? null : rv.count ?? null,
-      exec_weekly_error: ew.error ? ew.error.message : null,
-      reviews_error: rv.error ? rv.error.message : null,
+      storesCount: s.error ? null : s.count ?? null,
+      reviewsCount: r.error ? null : r.count ?? null,
+      ingestEventsCount: ie.error ? null : ie.count ?? null,
       now: new Date().toISOString(),
-      server_build: "EXEC_WEEKLY_SHAPE_V2",
+      server_build: "EXEC_WEEKLY_SHAPE_V2_APIFY_INGEST",
     });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "debug_error" });
@@ -143,85 +173,26 @@ app.get("/api/debug", async (_req, res) => {
 });
 
 // ---------- /api/stores ----------
-// FIX: derive stores from exec_weekly so we don't depend on stores_unique existing.
 app.get("/api/stores", async (_req, res) => {
   try {
-    if (!supabase) {
-      return res.status(500).json({ ok: false, error: "SUPABASE_NOT_CONFIGURED" });
-    }
+    if (!requireSupabase(res)) return;
 
-    const limit = 6000;
-    const { data, error } = await supabase
-      .from(CFG.EXEC_WEEKLY)
-      .select("store_id, place_name, city, state")
-      .limit(limit);
+    const { data, error } = await supabase.from(CFG.STORES_UNIQUE).select("*").limit(10000);
+    if (error) throw error;
 
-    let rowsSource = data ?? [];
-    let nameField = "place_name";
+    const rows = (data ?? []).map(normalizeStoreRow);
 
-    if (error) {
-      const fallback = await supabase.from(CFG.EXEC_WEEKLY).select("*").limit(limit);
-      if (fallback.error) {
-        return res.status(500).json({
-          ok: false,
-          error: "stores_query_failed",
-          details: {
-            primary: error.message,
-            fallback: fallback.error.message,
-          },
-        });
-      }
-
-      rowsSource = fallback.data ?? [];
-      nameField = pickStoreNameField(rowsSource);
-    }
-
-    const map = new Map();
-    for (const r of rowsSource) {
-      if (!r?.store_id) continue;
-      if (!map.has(r.store_id)) {
-        const name = (r?.[nameField] ?? "").toString().trim() || "Unknown";
-        const city = r.city || "";
-        const state = r.state || "";
-        const label = `${name} — ${city}, ${state}`.replace(" — , ", " — ").replace(/,\s*$/, "");
-
-        map.set(r.store_id, {
-          id: r.store_id,
-          name,
-          city,
-          state,
-          label,
-        });
-      }
-    }
-
-    const rows = Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-
-    return res.json({
+    res.json({
       ok: true,
-      signature: "STORES_FROM_EXEC_WEEKLY_V1",
+      signature: "STORES_V1_SHAPE",
+      last_updated: new Date().toISOString(),
       records: rows.length,
       rows,
     });
   } catch (e) {
-    return res.status(500).json({
-      ok: false,
-      error: e?.message || String(e),
-    });
+    res.status(500).json({ ok: false, error: e?.message || "stores_error" });
   }
 });
-
-function pickStoreNameField(rows) {
-  const candidates = ["place_name", "store_name", "name", "location_name"];
-  for (const r of rows || []) {
-    if (!r || typeof r !== "object") continue;
-    for (const c of candidates) {
-      const v = r?.[c];
-      if (v !== null && v !== undefined && String(v).trim()) return c;
-    }
-  }
-  return "place_name";
-}
 
 // ---------- /api/reviews ----------
 app.get("/api/reviews", async (req, res) => {
@@ -375,7 +346,7 @@ app.get("/api/meta", async (_req, res) => {
   }
 });
 
-// ---------- INGEST ----------
+// ---------- INGEST (existing): /api/ingest/reviews ----------
 app.post("/api/ingest/reviews", async (req, res) => {
   try {
     if (!requireSupabase(res)) return;
@@ -417,10 +388,47 @@ app.post("/api/ingest/reviews", async (req, res) => {
   }
 });
 
+// ---------- INGEST (NEW): /api/ingest/apify ----------
+app.post("/api/ingest/apify", async (req, res) => {
+  try {
+    if (!requireSupabase(res)) return;
+    if (!requireIngestToken(req, res)) return;
+
+    const payload = req.body ?? {};
+    const received_at = new Date().toISOString();
+
+    // Always store raw payload for audit/replay
+    const ins = await supabase
+      .from(CFG.INGEST_EVENTS)
+      .insert([
+        {
+          source: "apify",
+          received_at,
+          payload,
+        },
+      ])
+      .select("id, received_at")
+      .single();
+
+    if (ins.error) throw ins.error;
+
+    res.json({
+      ok: true,
+      signature: "INGEST_APIFY_V1",
+      last_updated: received_at,
+      ingest_event: ins.data,
+      note: "Stored raw payload into ingest_events.",
+    });
+  } catch (e) {
+    console.error("INGEST_APIFY_ERROR:", e?.message || e);
+    res.status(500).json({ ok: false, error: e?.message || "ingest_apify_error" });
+  }
+});
+
 // ---------- start ----------
 const server = app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
-  console.log("✅ SERVER BUILD: EXEC_WEEKLY_SHAPE_V2");
+  console.log("✅ SERVER BUILD: EXEC_WEEKLY_SHAPE_V2_APIFY_INGEST");
 });
 
 // Make CTRL+C safer / avoid orphan server
