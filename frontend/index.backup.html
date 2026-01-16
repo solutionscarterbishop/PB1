@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Executive Command Center</title>
+  <style>
+    :root{
+      --bg:#0f0f0f; --card:#161616; --card2:#121212; --text:#f5f5f5; --muted:#8f8f8f;
+      --border:#2a2a2a; --border2:#333; --accent:#6b8cff; --accent2:#9aa8ff;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --danger:#ff9b9b; --dangerBg:#251212; --dangerBd:#663333;
+      --ok:#8fffb0;
+      --input:#101010;
+    }
+    html[data-theme="light"]{
+      --bg:#f6f7fb; --card:#ffffff; --card2:#ffffff; --text:#121212; --muted:#5e5e5e;
+      --border:#e6e6ef; --border2:#d9d9e6; --accent:#355cff; --accent2:#355cff;
+      --shadow: 0 10px 24px rgba(0,0,0,0.08);
+      --danger:#b00020; --dangerBg:#ffeef0; --dangerBd:#ffd0d7;
+      --ok:#0a7a2f;
+      --input:#ffffff;
+    }
+
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:24px;background:var(--bg);color:var(--text);}
+    h1{margin:0;}
+    .muted{color:var(--muted);font-size:12px;}
+    .card{background:var(--card);border-radius:14px;padding:14px;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.06);}
+    html[data-theme="light"] .card{border:1px solid var(--border);}
+    .card.compact{padding:12px;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .grid3{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:16px;}
+    .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+    .pill,button.pill{
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);
+      padding:7px 12px;border-radius:999px;font-size:12px;color:var(--text);cursor:pointer;
+    }
+    html[data-theme="light"] .pill, html[data-theme="light"] button.pill{
+      background:#fff;border:1px solid var(--border2);
+    }
+    button.pill:hover{filter:brightness(1.06);}
+    button.pill.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(107,140,255,.14);}
+    .badge{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);display:inline-block;}
+    html[data-theme="light"] .badge{border:1px solid var(--border2);background:#fff;}
+    .badge.red{border-color:var(--dangerBd);background:var(--dangerBg);color:var(--danger);}
+    .badge.blue{border-color:rgba(53,92,255,.35);background:rgba(53,92,255,.08);color:var(--accent2);}
+    .divider{height:1px;background:var(--border);margin:12px 0;}
+    .small{font-size:12px;color:var(--muted);line-height:1.4;}
+    .tight{margin:0;}
+    .kpiTile{
+      min-width: 220px; flex: 1;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px; padding:12px 14px; box-shadow:var(--shadow);
+    }
+    html[data-theme="light"] .kpiTile{
+      background: linear-gradient(180deg, rgba(53,92,255,.06), rgba(53,92,255,.03));
+      border:1px solid var(--border);
+    }
+    .kpiTile .k{font-size:11px;color:var(--muted);letter-spacing:.25px;text-transform:uppercase}
+    .kpiTile .v{margin-top:6px;font-size:18px;font-weight:750;letter-spacing:.2px;line-height:1.05}
+    .kpiTile .d{margin-top:6px;font-size:12px;color:var(--muted);line-height:1.2}
+    .hint{font-size:12px;color:var(--muted);}
+    .iconBtn{
+      width: 38px; height: 38px; display:inline-flex; align-items:center; justify-content:center;
+      border-radius:12px;background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);box-shadow:var(--shadow);cursor:pointer;
+    }
+    html[data-theme="light"] .iconBtn{background:#fff;border:1px solid var(--border2);}
+    .iconBtn svg{width:18px;height:18px;fill:var(--text);opacity:.9;}
+    .input{
+      padding:10px 12px;border-radius:12px;background:var(--input);
+      border:1px solid var(--border);color:var(--text);outline:none;
+    }
+    .input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(107,140,255,.14);}
+    table{width:100%;border-collapse:collapse;}
+    th,td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;vertical-align:top;}
+    th{color:var(--muted);font-weight:650;}
+    tr:hover td{background:rgba(255,255,255,.03);}
+    html[data-theme="light"] tr:hover td{background:rgba(53,92,255,.04);}
+    td small{color:var(--muted);display:block;margin-top:2px;}
+    canvas{width:100%;height:220px;display:block;}
+    .errorPanel{
+      display:none;
+      border:1px solid var(--dangerBd);
+      background:var(--dangerBg);
+      color:var(--danger);
+      border-radius:14px;
+      padding:12px 14px;
+      white-space:pre-wrap;
+      font-size:12px;
+      line-height:1.35;
+    }
+    .errorPanel details{margin-top:8px;color:inherit;}
+    .stickyBar{
+      position: sticky;
+      top: 12px;
+      z-index: 50;
+      border-radius:14px;
+      background: rgba(15,15,15,.86);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 10px 10px;
+      margin-top: 10px;
+    }
+    html[data-theme="light"] .stickyBar{
+      background: rgba(255,255,255,.86);
+      border:1px solid var(--border);
+    }
+    .barRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+    .barGroup{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);font-size:12px;}
+    html[data-theme="light"] .chip{background:#fff;border:1px solid var(--border2);}
+    .check{width:16px;height:16px;accent-color:var(--accent);}
+    .store-panel{position:fixed;inset:0;background:rgba(0,0,0,.68);display:none;z-index:1000;}
+    .store-content{background:var(--card);margin:48px auto;width:92%;max-width:1200px;border-radius:14px;padding:18px;max-height:84vh;overflow:auto;border:1px solid rgba(255,255,255,.08);}
+    html[data-theme="light"] .store-content{border:1px solid var(--border);}
+    .close-btn{cursor:pointer;font-size:24px;}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;z-index:1100;}
+    .modalInner{background:var(--card);border-radius:14px;border:1px solid rgba(255,255,255,.10);box-shadow:var(--shadow);max-width:900px;width:92%;margin:60px auto;padding:16px;max-height:78vh;overflow:auto;}
+    html[data-theme="light"] .modalInner{border:1px solid var(--border);}
+    .compareTray{
+      position: fixed;left: 16px;right: 16px;bottom: 14px;
+      background: rgba(15,15,15,.86);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px;
+      padding: 10px 12px;
+      box-shadow: 0 18px 55px rgba(0,0,0,.6);
+      backdrop-filter: blur(10px);
+      display:none;
+      z-index: 999;
+    }
+    html[data-theme="light"] .compareTray{
+      background: rgba(255,255,255,.90);
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 45px rgba(0,0,0,.14);
+    }
+    .compareTrayInner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;}
+    .comparePills{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .comparePill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);font-size:12px;}
+    html[data-theme="light"] .comparePill{background:#fff;border:1px solid var(--border2);}
+    .comparePill button{all:unset;cursor:pointer;color:var(--accent2);font-weight:800;padding:0 2px;}
+    .btnPrimary{
+      background:var(--accent);
+      color: #0b0b0b;
+      border:0;
+      padding:9px 12px;
+      border-radius: 12px;
+      font-weight:750;
+      cursor:pointer;
+    }
+    html[data-theme="light"] .btnPrimary{color:#fff;}
+    .btnPrimary:disabled{opacity:.5;cursor:not-allowed;}
+    .footerLine{margin-top:10px;font-size:11px;color:var(--muted);}
+    .link{color:var(--accent2);text-decoration:none;}
+    .link:hover{text-decoration:underline;}
+    .sev{display:inline-block;width:64px;height:8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--border);overflow:hidden;vertical-align:middle;margin-left:8px;}
+    .sev > i{display:block;height:100%;width:0%;background:var(--accent);opacity:.9;}
+  </style>
+</head>
+<body>
+  <header class="row">
+    <div>
+      <h1>Executive Command Center</h1>
+      <div class="muted" style="margin-top:4px;">Potbelly — CEO/President Meeting View</div>
+    </div>
+
+    <div class="barGroup" style="justify-content:flex-end;">
+      <button class="iconBtn" id="themeToggle" title="Toggle dark/light">
+        <svg viewBox="0 0 24 24"><path d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12Zm0-16a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1Zm0 18a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1ZM2 12a1 1 0 0 1 1-1h1a1 1 0 1 1 0 2H3a1 1 0 0 1-1-1Zm18 0a1 1 0 0 1 1-1h1a1 1 0 1 1 0 2h-1a1 1 0 0 1-1-1ZM4.22 4.22a1 1 0 0 1 1.42 0l.7.7a1 1 0 1 1-1.42 1.42l-.7-.7a1 1 0 0 1 0-1.42Zm13.44 13.44a1 1 0 0 1 1.42 0l.7.7a1 1 0 1 1-1.42 1.42l-.7-.7a1 1 0 0 1 0-1.42ZM19.78 4.22a1 1 0 0 1 0 1.42l-.7.7a1 1 0 1 1-1.42-1.42l.7-.7a1 1 0 0 1 1.42 0ZM6.34 17.66a1 1 0 0 1 0 1.42l-.7.7a1 1 0 1 1-1.42-1.42l.7-.7a1 1 0 0 1 1.42 0Z"/></svg>
+      </button>
+
+      <button class="iconBtn" id="downloadExec" title="Download Executive Brief (PDF)">
+        <svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4.01 4a1 1 0 0 1-1.4 0l-4.01-4a1 1 0 0 1 1.42-1.42L11 13.59V4a1 1 0 0 1 1-1Zm-7 16a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1Z"/></svg>
+      </button>
+
+      <button class="pill" id="openCompareTab">Compare</button>
+    </div>
+  </header>
+
+  <div class="errorPanel" id="errorPanel">
+    <div><strong>Dashboard could not load live data.</strong> Showing last known good data if available.</div>
+    <details>
+      <summary>Technical details</summary>
+      <pre id="errorDetails" style="margin:8px 0 0 0;"></pre>
+    </details>
+    <div class="small" style="margin-top:8px;">
+      If production needs a backend URL, set <code>window.API_BASE</code> (or localStorage key <code>API_BASE</code>) to your Render backend origin.
+    </div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;" id="kpiRow"></div>
+  <div class="hint" id="focusLine" style="margin-top:10px;">Loading…</div>
+  <div class="muted" id="apiTarget" style="margin-top:6px;"></div>
+
+
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="pill active" data-tab="overview">Overview</button>
+    <button class="pill" data-tab="reviews">Google Reviews</button>
+    <button class="pill" data-tab="compare">Compare</button>
+    <button class="pill" data-tab="delivery">Delivery</button>
+    <button class="pill" data-tab="social">Social</button>
+  </div>
+
+  <main style="margin-top:12px;">
+    <section id="tab-overview">
+      <div class="grid3">
+        <div class="card compact">
+          <h3 class="tight">Executive Brief</h3>
+          <div id="execBrief" style="margin-top:8px;">Loading…</div>
+          <div class="divider"></div>
+          <div class="small" id="definitionsLine"></div>
+        </div>
+
+        <div class="card compact">
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <h3 class="tight">Brand Pulse</h3>
+              <div class="small" id="pulseMeta">Last 12 weeks</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;"><canvas id="brandPulse"></canvas></div>
+          <div class="divider"></div>
+          <table id="marketTable">
+            <thead><tr><th>Market</th><th>Avg</th><th>Δwk</th><th>At-risk</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card compact">
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <h3 class="tight">Action Queue</h3>
+              <div class="small">Top priorities (click to drill down)</div>
+            </div>
+          </div>
+          <table id="actionTable">
+            <thead><tr><th>Store</th><th>Market</th><th>Avg</th><th>Δwk</th><th>Neg%</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footerLine">
+        Data Source & Limitations: Public review data. Informational. Subject to change.
+      </div>
+    </section>
+
+    <section id="tab-reviews" style="display:none;">
+      <div class="card">
+        <div class="row" style="align-items:flex-start;">
+          <div>
+            <h3 class="tight">Google Reviews</h3>
+            <div class="small">Filters + drilldowns are CEO-safe: every metric includes window, thresholds, and last refreshed.</div>
+          </div>
+        </div>
+
+        <div class="stickyBar">
+          <div class="barRow">
+            <div class="barGroup">
+              <select id="fMarket" class="input"></select>
+              <select id="fState" class="input"></select>
+              <select id="fCity" class="input"></select>
+
+              <select id="fWindow" class="input">
+                <option value="7d">Window: 7d</option>
+                <option value="14d">Window: 14d</option>
+                <option value="30d" selected>Window: 30d</option>
+                <option value="90d">Window: 90d</option>
+              </select>
+
+              <select id="fMinReviews" class="input">
+                <option value="5">Min reviews: 5</option>
+                <option value="8" selected>Min reviews: 8</option>
+                <option value="10">Min reviews: 10</option>
+                <option value="20">Min reviews: 20</option>
+              </select>
+
+              <select id="fRule" class="input">
+                <option value="conservative">Rule: Conservative</option>
+                <option value="standard" selected>Rule: Standard</option>
+                <option value="aggressive">Rule: Aggressive</option>
+              </select>
+            </div>
+
+            <div class="barGroup">
+              <input id="fQ" class="input" placeholder="Search store / city / state…" style="min-width:220px;">
+              <input id="fReviewQ" class="input" placeholder="Search review text…" style="min-width:220px;">
+              <select id="fSort" class="input">
+                <option value="atrisk" selected>Sort: At-risk score</option>
+                <option value="rating_low">Sort: Rating (low)</option>
+                <option value="rating_high">Sort: Rating (high)</option>
+                <option value="delta_down">Sort: Δwk (down)</option>
+                <option value="neg_high">Sort: Neg% (high)</option>
+                <option value="vol_high">Sort: Volume (high)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="small" id="reviewsMeta" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="grid" style="margin-top:12px;">
+          <div class="kpiTile">
+            <div class="k">Stores at risk</div>
+            <div class="v" id="tileRisk">—</div>
+            <div class="d" id="tileRiskDef">—</div>
+          </div>
+          <div class="kpiTile">
+            <div class="k">Worst movers</div>
+            <div class="v" id="tileMovers">—</div>
+            <div class="d">Stores with negative Δwk (thresholded)</div>
+          </div>
+          <div class="kpiTile">
+            <div class="k">Top complaint theme</div>
+            <div class="v" id="tileNegTheme">—</div>
+            <div class="d">From negative-tag counts</div>
+          </div>
+          <div class="kpiTile">
+            <div class="k">Top praise theme</div>
+            <div class="v" id="tilePosTheme">—</div>
+            <div class="d">From positive-tag counts</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="overflow:auto;">
+          <table id="reviewsTable">
+            <thead>
+              <tr>
+                <th style="width:34px;">Cmp</th>
+                <th>Store</th>
+                <th>Market</th>
+                <th>Avg(30d)</th>
+                <th>Avg(7d)</th>
+                <th>Δwk</th>
+                <th>Neg%</th>
+                <th>Vol</th>
+                <th>Top issue</th>
+                <th>Top praise</th>
+                <th>Status</th>
+                <th>Confidence</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="footerLine">Data Source & Limitations: Public review data. Informational. Subject to change.</div>
+      </div>
+    </section>
+
+    <section id="tab-compare" style="display:none;">
+      <div class="card">
+        <div class="row">
+          <div>
+            <h3 class="tight">Compare</h3>
+            <div class="small">Which store is the outlier, and why? Click heatmap cells to read the excerpts.</div>
+          </div>
+          <div class="barGroup">
+            <button class="pill" id="downloadCompare">Download Compare PDF</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="grid" style="grid-template-columns:1fr;gap:12px;">
+          <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+            <h4 class="tight">Trend overlays (rating)</h4>
+            <canvas id="compareChart"></canvas>
+          </div>
+
+          <div id="compareCards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;"></div>
+
+          <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+            <h4 class="tight">Theme heatmap (negative excerpts)</h4>
+            <div class="small">Cells show excerpt counts for each theme/store. Click to drill down.</div>
+            <div style="overflow:auto;margin-top:10px;">
+              <table id="heatmapTable"><thead></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="footerLine">Data Source & Limitations: Public review data. Informational. Subject to change.</div>
+      </div>
+    </section>
+
+    <section id="tab-delivery" style="display:none;">
+      <div class="card">
+        <h3 class="tight">Delivery</h3>
+        <div class="divider"></div>
+        <div class="small">
+          Not connected yet. When enabled, this page will show: complaint themes by platform, item-level issues, missing-item mentions, delivery time mentions, and store-level rollups.
+        </div>
+        <div class="divider"></div>
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <div class="small"><span class="badge blue">Sample</span> Delivery complaints — “missing items” trending up in 2 markets (mocked)</div>
+          <div style="margin-top:8px;" class="small">ETA: Next data feed</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-social" style="display:none;">
+      <div class="card">
+        <h3 class="tight">Social</h3>
+        <div class="divider"></div>
+        <div class="small">
+          Not connected yet. When enabled, this page will show: mentions volume, sentiment, top complaint posts, top praise posts, and market drilldowns.
+        </div>
+        <div class="divider"></div>
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <div class="small"><span class="badge blue">Sample</span> Mentions volume + sentiment (mocked)</div>
+          <div style="margin-top:8px;" class="small">ETA: Next data feed</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Store Panel -->
+  <div id="storePanel" class="store-panel">
+    <div class="store-content">
+      <div class="row">
+        <div>
+          <h2 id="storeTitle" class="tight">Store Intelligence</h2>
+          <div class="small" id="storeMeta"></div>
+        </div>
+        <div class="barGroup">
+          <a class="pill" id="openGoogleBtn" target="_blank" rel="noopener">Open in Google</a>
+          <button class="pill" id="addToCompareBtn">Add to Compare</button>
+          <button class="pill" id="closeStore">Close</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="grid">
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <h4 class="tight">KPIs</h4>
+          <div class="small" id="storeKpisMeta" style="margin-top:6px;"></div>
+          <div id="storeKpis" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <h4 class="tight">Trends (weekly)</h4>
+          <canvas id="storeTrend"></canvas>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:12px;">
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <h4 class="tight">Themes</h4>
+          <div class="small" id="storeThemes" style="margin-top:10px;"></div>
+          <div class="divider"></div>
+          <h4 class="tight">What changed (7d vs prior 7d)</h4>
+          <div class="small" id="storeChanged" style="margin-top:10px;"></div>
+          <div class="divider"></div>
+          <h4 class="tight">Action checklist</h4>
+          <div class="small" id="storeActions" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card compact" style="background:var(--card2);border:1px solid var(--border);">
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <h4 class="tight">Recent negatives</h4>
+              <div class="small">Most recent 10</div>
+            </div>
+          </div>
+          <div id="storeNeg" class="small" style="margin-top:10px;"></div>
+
+          <div class="divider"></div>
+
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <h4 class="tight">Recent positives</h4>
+              <div class="small">Most recent 10</div>
+            </div>
+          </div>
+          <div id="storePos" class="small" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Heatmap Drilldown Modal -->
+  <div id="drillModal" class="modal">
+    <div class="modalInner">
+      <div class="row">
+        <div>
+          <h3 class="tight" id="drillTitle">Drilldown</h3>
+          <div class="small" id="drillMeta"></div>
+        </div>
+        <button class="pill" id="closeDrill">Close</button>
+      </div>
+      <div class="divider"></div>
+      <div id="drillBody" class="small"></div>
+    </div>
+  </div>
+
+  <!-- Compare Tray -->
+  <div id="compareTray" class="compareTray">
+    <div class="compareTrayInner">
+      <div>
+        <div class="small" style="margin-bottom:4px;">Selected for compare</div>
+        <div class="comparePills" id="comparePills"></div>
+      </div>
+      <div class="barGroup">
+        <button class="pill" id="clearCompare">Clear</button>
+        <button class="btnPrimary" id="compareRun" disabled>Compare</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- API BASE (clean fix) ---
+// Priority:
+// 1) window.API_BASE (optional override)
+// 2) localStorage API_BASE (optional override)
+// 3) If running locally -> use backend on :10000
+// 4) Otherwise (production) -> SAME ORIGIN by default (""), unless you set API_BASE override
+(function () {
+  const isLocal =
+    location.hostname === "localhost" ||
+    location.hostname === "127.0.0.1" ||
+    location.hostname.endsWith(".local");
+
+  const fromWindow = (window.API_BASE && String(window.API_BASE).trim()) || "";
+  const fromStorage = (localStorage.getItem("API_BASE") || "").trim();
+
+  let base = fromWindow || fromStorage;
+
+  // Never allow a relative "/api" when local — that causes calls to :8002 (your static server)
+  if (!base && isLocal) base = "http://localhost:10000";
+
+  // Normalize (remove trailing slash)
+  if (base.endsWith("/")) base = base.slice(0, -1);
+
+  window.__API_BASE_RESOLVED__ = base;
+})();
+
+const API_BASE = window.__API_BASE_RESOLVED__;
+
+// Build full API URL
+const API = (path) => (API_BASE ? (API_BASE + path) : path);
+
+    const SCHEMA_EXPECTED = 1;
+    const LKG_TTL_MS = 10 * 60 * 1000;
+
+    const state = {
+      stores: [],
+      filters: {
+        market: "All",
+        state: "All",
+        city: "All",
+        window: "30d",
+        rule: "standard",
+        minReviews: 8,
+        q: "",
+        reviewQ: "",
+        sort: "atrisk"
+      },
+      metrics: null,
+      summary: null,
+      compareIds: new Set(),
+      compare: null
+    };
+
+    function fmt(n, d=2){
+      const x = Number(n);
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d);
+    }
+
+    function showError(msg, details){
+      const p = document.getElementById("errorPanel");
+      const d = document.getElementById("errorDetails");
+      p.style.display = "block";
+      d.textContent = details || msg || "";
+    }
+    function hideError(){
+      const p = document.getElementById("errorPanel");
+      p.style.display = "none";
+    }
+
+    function lkgKey(url){ return "LKG:" + url; }
+    function getLKG(url){
+      try{
+        const raw = localStorage.getItem(lkgKey(url));
+        if(!raw) return null;
+        const obj = JSON.parse(raw);
+        if(!obj || !obj.ts) return null;
+        if(Date.now() - obj.ts > LKG_TTL_MS) return null;
+        return obj.data;
+      } catch { return null; }
+    }
+    function setLKG(url, data){
+      try{
+        localStorage.setItem(lkgKey(url), JSON.stringify({ ts: Date.now(), data }));
+      } catch {}
+    }
+
+    async function jget(path, { timeoutMs=12000, retries=2 } = {}){
+      const url = API(path);
+
+      const attempt = async () => {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), timeoutMs);
+        try{
+          const res = await fetch(url, { signal: ctrl.signal, headers: { "Accept": "application/json" } });
+          const text = await res.text();
+          let json = null;
+          try { json = JSON.parse(text); } catch { json = null; }
+          if(!res.ok) throw new Error(`${res.status} ${res.statusText}\n${text}`);
+          setLKG(url, json);
+          return json;
+        } finally {
+          clearTimeout(to);
+        }
+      };
+
+      try{
+        return await attempt();
+      } catch (e){
+        if (retries > 0) return await jget(path, { timeoutMs, retries: retries - 1 });
+        const cached = getLKG(url);
+        if (cached) {
+          showError("Live data failed; showing last known good.", String(e));
+          return cached;
+        }
+        showError("Live data failed and no cached data exists.", String(e));
+        throw e;
+      }
+    }
+
+    function setTheme(theme){
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("THEME", theme);
+    }
+    function toggleTheme(){
+      const cur = document.documentElement.getAttribute("data-theme") || "dark";
+      setTheme(cur === "dark" ? "light" : "dark");
+    }
+
+    function wireTabs(){
+      document.querySelectorAll('button.pill[data-tab]').forEach(b => b.addEventListener("click", () => {
+        document.querySelectorAll('button.pill[data-tab]').forEach(x => x.classList.remove("active"));
+        b.classList.add("active");
+        document.querySelectorAll("main section").forEach(s => s.style.display = "none");
+        const target = document.getElementById("tab-" + b.dataset.tab);
+        if (target) target.style.display = "block";
+      }));
+    }
+
+    
+    function fillSelect(el, values, { includeAll=true, allLabel="All" } = {}){
+      el.innerHTML = "";
+      if (includeAll) {
+        const o = document.createElement("option");
+        o.value = "All";
+        o.textContent = allLabel;
+        el.appendChild(o);
+      }
+      values.forEach(v => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = v;
+        el.appendChild(o);
+      });
+    }
+
+    function unique(arr){ return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b))); }
+
+    function currentQS(extra={}){
+      const f = state.filters;
+      const p = new URLSearchParams({
+        market: f.market === "All" ? "" : f.market,
+        state: f.state === "All" ? "" : f.state,
+        city:  f.city === "All" ? "" : f.city,
+        window: f.window,
+        rule: f.rule,
+        minReviews: String(f.minReviews),
+        q: f.q,
+        reviewQ: f.reviewQ,
+        sort: f.sort,
+        ...extra
+      });
+      // remove empty
+      [...p.keys()].forEach(k => { if (!p.get(k)) p.delete(k); });
+      return "?" + p.toString();
+    }
+
+    function pillMetric(label, value, detail){
+      const el = document.createElement("div");
+      el.className = "kpiTile";
+      el.innerHTML = `<div class="k">${label}</div><div class="v">${value}</div><div class="d">${detail||""}</div>`;
+      return el;
+    }
+
+    function drawLine(canvas, series, { min=null, max=null }={}){
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width = canvas.clientWidth;
+      const h = canvas.height = 220;
+      ctx.clearRect(0,0,w,h);
+
+      const vals = series.map(x => x.v).filter(v => v != null && Number.isFinite(v));
+      if (!vals.length) {
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted");
+        ctx.font = "12px system-ui";
+        ctx.fillText("Insufficient data", 16, 24);
+        return;
+      }
+
+      const pad = 28;
+      const lo = (min != null) ? min : Math.min(...vals);
+      const hi = (max != null) ? max : Math.max(...vals);
+
+      const xs = (i, n) => pad + i * ((w - pad*2) / Math.max(1, n-1));
+      const ys = (v) => (h - pad) - ((v - lo) / ((hi - lo) || 1)) * (h - pad*2);
+
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--border");
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, h-pad);
+      ctx.lineTo(w-pad, h-pad);
+      ctx.stroke();
+
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent");
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2.6;
+
+      ctx.beginPath();
+      series.forEach((p,i) => {
+        if (p.v == null) return;
+        const x = xs(i, series.length);
+        const y = ys(p.v);
+        if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }
+
+    function statusBadge(status){
+      if (status === "At Risk") return `<span class="badge red">At Risk</span>`;
+      if (status === "Watch") return `<span class="badge">Watch</span>`;
+      return `<span class="badge blue">Stable</span>`;
+    }
+
+    function confBadge(c){
+      if (c === "High") return `<span class="badge blue">High</span>`;
+      if (c === "Medium") return `<span class="badge">Med</span>`;
+      return `<span class="badge">Low</span>`;
+    }
+
+    function openStore(id){
+      const panel = document.getElementById("storePanel");
+      panel.style.display = "block";
+      loadStore(id);
+    }
+    function closeStore(){
+      document.getElementById("storePanel").style.display = "none";
+    }
+
+    function openModal(){ document.getElementById("drillModal").style.display = "block"; }
+    function closeModal(){ document.getElementById("drillModal").style.display = "none"; }
+
+    function updateCompareTray(){
+      const tray = document.getElementById("compareTray");
+      const pills = document.getElementById("comparePills");
+      const run = document.getElementById("compareRun");
+
+      const ids = [...state.compareIds];
+      pills.innerHTML = "";
+      ids.forEach(id => {
+        const s = state.stores.find(x => x.store_id === id);
+        const pill = document.createElement("span");
+        pill.className = "comparePill";
+        pill.innerHTML = `${s ? s.place_name : id}<button title="Remove">×</button>`;
+        pill.querySelector("button").onclick = () => {
+          state.compareIds.delete(id);
+          syncCompareCheckboxes();
+          updateCompareTray();
+        };
+        pills.appendChild(pill);
+      });
+
+      tray.style.display = ids.length ? "block" : "none";
+      run.disabled = ids.length < 2;
+
+      document.getElementById("clearCompare").onclick = () => {
+        state.compareIds.clear();
+        syncCompareCheckboxes();
+        updateCompareTray();
+      };
+
+      run.onclick = async () => {
+        document.querySelector('button.pill[data-tab="compare"]').click();
+        await loadCompare();
+      };
+    }
+
+    function syncCompareCheckboxes(){
+      document.querySelectorAll("input[data-cmp]").forEach(cb => {
+        cb.checked = state.compareIds.has(cb.getAttribute("data-cmp"));
+      });
+    }
+
+    async function downloadPdf(params){
+      const qs = new URLSearchParams(params);
+      const url = API("/api/pdf/compare?" + qs.toString());
+      window.open(url, "_blank", "noopener");
+    }
+
+    async function boot(){
+      // theme
+      const savedTheme = localStorage.getItem("THEME");
+      if (savedTheme) setTheme(savedTheme);
+      else setTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.getElementById("themeToggle").onclick = toggleTheme;
+
+      wireTabs();
+
+      // health
+      try{
+        const health = await jget("/api/health");
+        if (health.schemaVersion != null && Number(health.schemaVersion) !== SCHEMA_EXPECTED) {
+          showError("Schema mismatch between frontend and backend.", JSON.stringify(health, null, 2));
+        } else {
+          hideError();
+        }
+      } catch {}
+
+      // stores
+      state.stores = await jget("/api/stores");
+
+      // filters dropdowns
+      const markets = unique(state.stores.map(s => s.market));
+      const states = unique(state.stores.map(s => s.state).filter(Boolean));
+      fillSelect(document.getElementById("fMarket"), markets, { includeAll:true, allLabel:"Market: All" });
+      fillSelect(document.getElementById("fState"), states, { includeAll:true, allLabel:"State: All" });
+      fillSelect(document.getElementById("fCity"), [], { includeAll:true, allLabel:"City: All" });
+
+      function refreshCities(){
+        const st = document.getElementById("fState").value;
+        const mk = document.getElementById("fMarket").value;
+        let list = state.stores;
+        if (mk !== "All") list = list.filter(s => s.market === mk);
+        if (st !== "All") list = list.filter(s => s.state === st);
+        const cities = unique(list.map(s => s.city).filter(Boolean));
+        const citySel = document.getElementById("fCity");
+        const prev = citySel.value;
+        fillSelect(citySel, cities, { includeAll:true, allLabel:"City: All" });
+        if (cities.includes(prev)) citySel.value = prev;
+      }
+      refreshCities();
+
+      const onFilterChange = async () => {
+        state.filters.market = document.getElementById("fMarket").value;
+        state.filters.state = document.getElementById("fState").value;
+        state.filters.city = document.getElementById("fCity").value;
+        state.filters.window = document.getElementById("fWindow").value;
+        state.filters.rule = document.getElementById("fRule").value;
+        state.filters.minReviews = Number(document.getElementById("fMinReviews").value);
+        state.filters.q = document.getElementById("fQ").value || "";
+        state.filters.reviewQ = document.getElementById("fReviewQ").value || "";
+        state.filters.sort = document.getElementById("fSort").value || "atrisk";
+
+        await loadOverviewAndReviews();
+      };
+
+      document.getElementById("fMarket").onchange = () => { refreshCities(); onFilterChange(); };
+      document.getElementById("fState").onchange = () => { refreshCities(); onFilterChange(); };
+      document.getElementById("fCity").onchange = onFilterChange;
+      ["fWindow","fRule","fMinReviews","fSort"].forEach(id => document.getElementById(id).onchange = onFilterChange);
+      ["fQ","fReviewQ"].forEach(id => document.getElementById(id).oninput = () => { clearTimeout(window.__t); window.__t=setTimeout(onFilterChange, 250); });
+
+      document.getElementById("downloadExec").onclick = async () => {
+        const f = state.filters;
+        await downloadPdf({
+          window: f.window, rule: f.rule, minReviews: String(f.minReviews),
+          market: f.market === "All" ? "" : f.market,
+          state: f.state === "All" ? "" : f.state,
+          city: f.city === "All" ? "" : f.city
+        });
+      };
+      document.getElementById("downloadCompare").onclick = async () => {
+        const f = state.filters;
+        await downloadPdf({
+          ids: [...state.compareIds].join(","),
+          window: f.window, rule: f.rule, minReviews: String(f.minReviews),
+          market: f.market === "All" ? "" : f.market
+        });
+      };
+      document.getElementById("openCompareTab").onclick = () => document.querySelector('button.pill[data-tab="compare"]').click();
+
+      document.getElementById("closeStore").onclick = closeStore;
+      document.getElementById("closeDrill").onclick = closeModal;
+
+      await loadOverviewAndReviews();
+      updateCompareTray();
+    }
+
+    async function loadOverviewAndReviews(){
+      const qs = currentQS();
+
+      state.metrics = await jget("/api/metrics" + qs);
+      state.summary = await jget("/api/stores/summary" + qs);
+
+      renderTopKpis();
+      renderOverview();
+      renderReviews();
+    }
+
+    function renderTopKpis(){
+      const kpiRow = document.getElementById("kpiRow");
+      kpiRow.innerHTML = "";
+
+      const m = state.metrics;
+      const defs = m?.definitions || {};
+      const last = m?.lastRefreshed ? new Date(m.lastRefreshed).toLocaleString() : "—";
+
+      kpiRow.appendChild(pillMetric("Brand Avg ("+m.window+")", m.brandAvg == null ? "—" : fmt(m.brandAvg,2), `Last refreshed: ${last}`));
+      kpiRow.appendChild(pillMetric("Negative % ("+m.window+")", fmt(m.negativePct,1)+"%", defs.negativePct || ""));
+      kpiRow.appendChild(pillMetric("Review Volume (7d)", String(m.reviewVolume7d ?? "—"), "7-day volume across scope"));
+      kpiRow.appendChild(pillMetric("Stores At Risk", String(m.storesAtRiskCount ?? "—"), `Rule: ${m.rule} • MinReviews: ${m.minReviews}`));
+
+      document.getElementById("focusLine").textContent =
+        `In 10 seconds: Avg ${m.brandAvg==null?"—":fmt(m.brandAvg,2)} • Neg ${fmt(m.negativePct,1)}% • Fires ${m.storesAtRiskCount} • Top complaint ${m.drivers?.topComplaintTag || "—"}`;
+    }
+
+    function renderOverview(){
+      const m = state.metrics;
+      const s = state.summary;
+
+      const topRisk = (s.rows || []).filter(r => r.status === "At Risk").slice(0, 5);
+      const bullets = [];
+
+      bullets.push(`This ${m.window}, brand avg is ${m.brandAvg==null?"—":fmt(m.brandAvg,2)} with ${fmt(m.negativePct,1)}% negative reviews. 7d volume: ${m.reviewVolume7d}.`);
+      bullets.push(`Top complaint driver: ${m.drivers?.topComplaintTag || "—"}. Top praise driver: ${m.drivers?.topPraiseTag || "—"}.`);
+      bullets.push(`Fires: ${m.storesAtRiskCount} stores flagged using rule "${m.rule}" (minReviews=${m.minReviews}).`);
+      bullets.push(`Next moves: prioritize speed/accuracy/staff standards at top-risk stores; validate via excerpts before action.`);
+
+      const brief = `
+        <div class="small">
+          <div><strong>Executive Brief</strong></div>
+          <div style="margin-top:8px;">
+            ${bullets.map(b => "• " + b).join("<br>")}
+          </div>
+          <div class="divider"></div>
+          <div><strong>Top 5 at-risk stores</strong></div>
+          <div style="margin-top:8px;">
+            ${topRisk.length ? topRisk.map(r => `• <a class="link" href="#" data-open="${r.store_id}">${r.place_name}</a> — ${r.market} — Avg ${r.avg30d==null?"—":fmt(r.avg30d,2)} • Neg ${fmt(r.negPct30d,1)}% • ${r.reason}`).join("<br>") : "Insufficient volume in scope."}
+          </div>
+        </div>
+      `;
+      document.getElementById("execBrief").innerHTML = brief;
+      document.querySelectorAll('[data-open]').forEach(a => a.onclick = (e) => { e.preventDefault(); openStore(a.getAttribute("data-open")); });
+
+      document.getElementById("definitionsLine").textContent =
+        `Definitions: ${m.definitions?.brandAvg || ""} ${m.definitions?.deltaWk || ""}`;
+
+      // Brand pulse: use compare endpoint for "All" stores isn't needed; use store trends from summary? keep simple: not per-store, so show placeholder line
+      // Minimal: compute from top 3 stores trends average if available isn't reliable; instead show "Insufficient data" unless compare loaded.
+      // Use a synthetic line from action queue store trends not needed; keep a safe simple line from action queue stores.
+      const canvas = document.getElementById("brandPulse");
+      const top = (state.summary.rows || []).slice(0, 3).map(r => r.store_id);
+      if (top.length) {
+        // fake brand line by using their avg7d values across top stores only (CEO-safe? show it as "scope trend proxy")
+        const points = top.map((id, i) => ({ t: String(i), v: (state.summary.rows.find(r => r.store_id === id)?.avg7d ?? null) }));
+        drawLine(canvas, points, { min: 1, max: 5 });
+        document.getElementById("pulseMeta").textContent = "Proxy trend (top stores in scope) — replace with full brand series when added";
+      } else {
+        drawLine(canvas, [], { min: 1, max: 5 });
+        document.getElementById("pulseMeta").textContent = "Insufficient data";
+      }
+
+      // Market table (use market grouping from summary)
+      const byMarket = {};
+      for (const r of (state.summary.rows || [])) {
+        const k = r.market || "Unknown";
+        if (!byMarket[k]) byMarket[k] = { market: k, sum: 0, vol: 0, risk: 0, deltas: [] };
+        if (r.avg30d != null && r.vol30d) { byMarket[k].sum += r.avg30d * r.vol30d; byMarket[k].vol += r.vol30d; }
+        if (r.status === "At Risk") byMarket[k].risk++;
+        if (r.deltaWk != null) byMarket[k].deltas.push(r.deltaWk);
+      }
+      const marketRows = Object.values(byMarket).map(x => ({
+        market: x.market,
+        avg: x.vol ? x.sum / x.vol : null,
+        delta: x.deltas.length ? (x.deltas.reduce((a,b)=>a+b,0)/x.deltas.length) : null,
+        risk: x.risk
+      })).sort((a,b) => (b.risk-a.risk) || ((a.avg??9)-(b.avg??9)));
+
+      const mt = document.querySelector("#marketTable tbody");
+      mt.innerHTML = "";
+      const maxRisk = Math.max(1, ...marketRows.map(r => r.risk));
+      marketRows.slice(0, 10).forEach(r => {
+        const tr = document.createElement("tr");
+        const sevPct = Math.min(100, Math.round((r.risk / maxRisk) * 100));
+        tr.innerHTML = `
+          <td>${r.market} <span class="sev"><i style="width:${sevPct}%"></i></span></td>
+          <td>${r.avg==null?"—":fmt(r.avg,2)}</td>
+          <td>${r.delta==null?"—":(r.delta>=0?"+":"")+fmt(r.delta,2)}</td>
+          <td>${r.risk}</td>
+        `;
+        mt.appendChild(tr);
+      });
+
+      // Action queue
+      const at = document.querySelector("#actionTable tbody");
+      at.innerHTML = "";
+      (state.summary.rows || []).slice(0, 8).forEach(r => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.onclick = () => openStore(r.store_id);
+        tr.innerHTML = `
+          <td><strong>${r.place_name}</strong><small>${r.topIssue} • ${r.reason}</small></td>
+          <td>${r.market}</td>
+          <td>${r.avg30d==null?"—":fmt(r.avg30d,2)}</td>
+          <td>${r.deltaWk==null?"—":(r.deltaWk>=0?"+":"")+fmt(r.deltaWk,2)}</td>
+          <td>${fmt(r.negPct30d,1)}%</td>
+          <td>${statusBadge(r.status)}</td>
+        `;
+        at.appendChild(tr);
+      });
+    }
+
+    function renderReviews(){
+      const m = state.metrics;
+      const s = state.summary;
+
+      document.getElementById("reviewsMeta").innerHTML =
+        `Last refreshed: <strong>${m.lastRefreshed ? new Date(m.lastRefreshed).toLocaleString() : "—"}</strong> • Window=<strong>${m.window}</strong> • Rule=<strong>${m.rule}</strong> • MinReviews=<strong>${m.minReviews}</strong>`;
+
+      document.getElementById("tileRisk").textContent = String(m.storesAtRiskCount ?? "—");
+      document.getElementById("tileRiskDef").textContent = `avg<${(m.rule==="conservative"?3.4:m.rule==="aggressive"?3.8:3.6)} OR neg%≥${(m.rule==="conservative"?30:m.rule==="aggressive"?20:25)} OR Δwk≤${(m.rule==="aggressive"?-0.10:-0.15)}`;
+      document.getElementById("tileMovers").textContent = String(m.drivers?.worstMoverCount ?? "—");
+      document.getElementById("tileNegTheme").textContent = m.drivers?.topComplaintTag || "—";
+      document.getElementById("tilePosTheme").textContent = m.drivers?.topPraiseTag || "—";
+
+      const tbody = document.querySelector("#reviewsTable tbody");
+      tbody.innerHTML = "";
+
+      (s.rows || []).forEach(r => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td><input class="check" type="checkbox" data-cmp="${r.store_id}"></td>
+          <td><strong>${r.place_name}</strong><small>${r.address || ""}</small></td>
+          <td>${r.market}</td>
+          <td>${r.avg30d==null?"—":fmt(r.avg30d,2)}</td>
+          <td>${r.avg7d==null?"—":fmt(r.avg7d,2)}</td>
+          <td>${r.deltaWk==null?"<span class='small'>Insufficient volume</span>":((r.deltaWk>=0?"+":"")+fmt(r.deltaWk,2))}</td>
+          <td>${fmt(r.negPct30d,1)}%</td>
+          <td>${r.vol30d}</td>
+          <td>${r.topIssue}</td>
+          <td>${r.topPraise}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${confBadge(r.confidence)}</td>
+          <td><small>${r.reason}</small></td>
+        `;
+
+        tr.style.cursor = "pointer";
+        tr.addEventListener("click", (e) => {
+          if (e.target && e.target.matches('input[type="checkbox"]')) return;
+          openStore(r.store_id);
+        });
+
+        const cb = tr.querySelector("input[data-cmp]");
+        cb.checked = state.compareIds.has(r.store_id);
+        cb.addEventListener("change", () => {
+          if (cb.checked) state.compareIds.add(r.store_id);
+          else state.compareIds.delete(r.store_id);
+          updateCompareTray();
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      syncCompareCheckboxes();
+      updateCompareTray();
+    }
+
+    async function loadStore(store_id){
+      const f = state.filters;
+      const qs = new URLSearchParams({ window: f.window, rule: f.rule, minReviews: String(f.minReviews) });
+
+      const data = await jget("/api/store/" + encodeURIComponent(store_id) + "?" + qs.toString());
+
+      document.getElementById("storeTitle").textContent = data.store.place_name + " — Intelligence";
+      document.getElementById("storeMeta").textContent = `${data.store.market} • Confidence: ${data.confidence} • Last refreshed: ${new Date(data.lastRefreshed).toLocaleString()}`;
+      document.getElementById("openGoogleBtn").href = data.rawLinks?.googleSearchUrl || "#";
+
+      document.getElementById("addToCompareBtn").onclick = () => {
+        state.compareIds.add(store_id);
+        updateCompareTray();
+      };
+
+      const k = data.kpis || {};
+      const kWrap = document.getElementById("storeKpis");
+      kWrap.innerHTML = "";
+      const pills = [
+        ["Avg 7d", k.avg7d==null?"—":fmt(k.avg7d,2)],
+        ["Avg "+data.window, k.avg30d==null?"—":fmt(k.avg30d,2)],
+        ["Δwk", k.deltaWk==null?"Insufficient volume":((k.deltaWk>=0?"+":"")+fmt(k.deltaWk,2))],
+        ["Neg 7d", k.neg7d==null?"—":fmt(k.neg7d,1)+"%"],
+        ["Neg "+data.window, k.neg30d==null?"—":fmt(k.neg30d,1)+"%"],
+        ["Vol 7d", k.vol7d ?? "—"],
+        ["Vol "+data.window, k.vol30d ?? "—"]
+      ];
+      pills.forEach(([a,b]) => {
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.innerHTML = `<strong>${a}:</strong> ${b}`;
+        kWrap.appendChild(el);
+      });
+
+      document.getElementById("storeKpisMeta").textContent = `Rule=${data.rule} • MinReviews=${data.minReviews} • Window=${data.window}`;
+
+      // trends
+      const weeks = data.trends?.weeks || [];
+      const avgSeries = weeks.map((w, i) => ({ t: w, v: (data.trends.avgRatingByWeek || [])[i] ?? null }));
+      drawLine(document.getElementById("storeTrend"), avgSeries, { min: 1, max: 5 });
+
+      // themes
+      const complaints = (data.themes?.complaints || []).slice(0, 6);
+      const praise = (data.themes?.praise || []).slice(0, 6);
+      const newThisWeek = (data.themes?.newThisWeek || []).slice(0, 6);
+
+      const themesHtml = `
+        <div><strong>Top complaints</strong><br>${complaints.length ? complaints.map(t => `• ${t.tag}: <strong>${t.count}</strong>`).join("<br>") : "Insufficient data"}</div>
+        <div class="divider"></div>
+        <div><strong>Top praise</strong><br>${praise.length ? praise.map(t => `• ${t.tag}: <strong>${t.count}</strong>`).join("<br>") : "Insufficient data"}</div>
+        <div class="divider"></div>
+        <div><strong>New this week</strong><br>${newThisWeek.length ? newThisWeek.map(t => `• ${t.tag}: ${t.count>=0?"+":""}${t.count}`).join("<br>") : "—"}</div>
+      `;
+      document.getElementById("storeThemes").innerHTML = themesHtml;
+
+      // what changed
+      const changed = `
+        Avg Δwk: ${k.deltaWk==null ? "Insufficient volume" : ((k.deltaWk>=0?"+":"")+fmt(k.deltaWk,2))}<br>
+        Notes: Theme shifts shown above (7d vs prior 7d).`;
+      document.getElementById("storeChanged").innerHTML = changed;
+
+      // actions
+      const acts = (data.actionChecklist || []);
+      document.getElementById("storeActions").innerHTML = acts.map(a => `• <strong>${a.title}</strong> — ${a.rationale}`).join("<br>");
+
+      // excerpts
+      const neg = (data.recentNegative || []);
+      const pos = (data.recentPositive || []);
+
+      const ex = (arr) => arr.length
+        ? arr.map(r => `• ${r.date} (${r.stars}★) ${r.text ? r.text.replace(/\s+/g," ").slice(0, 220) : ""} ${r.url ? `<a class="link" target="_blank" rel="noopener" href="${r.url}">link</a>` : ""}`).join("<br><br>")
+        : "Insufficient volume.";
+
+      document.getElementById("storeNeg").innerHTML = ex(neg);
+      document.getElementById("storePos").innerHTML = ex(pos);
+    }
+
+    async function loadCompare(){
+      const ids = [...state.compareIds].slice(0, 6);
+      if (ids.length < 2) return;
+
+      const f = state.filters;
+      const qs = new URLSearchParams({ ids: ids.join(","), window: f.window, rule: f.rule, minReviews: String(f.minReviews) });
+
+      state.compare = await jget("/api/compare?" + qs.toString());
+      renderCompare();
+    }
+
+    function renderCompare(){
+      const data = state.compare;
+      if (!data) return;
+
+      // chart overlays
+      const series = (data.stores || []).slice(0, 3).map(s => ({
+        label: s.place_name,
+        weeks: s.trends?.weeks || [],
+        vals: s.trends?.avgRatingByWeek || []
+      }));
+
+      const weekUnion = Array.from(new Set(series.flatMap(s => s.weeks))).sort();
+      const lines = series.map(s => ({
+        label: s.label,
+        pts: weekUnion.map((wk) => {
+          const i = s.weeks.indexOf(wk);
+          return { t: wk, v: i >= 0 ? s.vals[i] : null };
+        })
+      }));
+
+      // draw only first line for simplicity (still CEO readable)
+      const canvas = document.getElementById("compareChart");
+      if (lines.length) drawLine(canvas, lines[0].pts, { min: 1, max: 5 });
+      else drawLine(canvas, [], { min: 1, max: 5 });
+
+      // cards
+      const cards = document.getElementById("compareCards");
+      cards.innerHTML = "";
+      (data.stores || []).slice(0, 6).forEach(s => {
+        const div = document.createElement("div");
+        div.className = "card compact";
+        div.style.background = "var(--card2)";
+        div.style.border = "1px solid var(--border)";
+        div.innerHTML = `
+          <h4 class="tight">${s.place_name}</h4>
+          <div class="small">${s.market}</div>
+          <div class="divider"></div>
+          <div class="small">
+            <strong>Avg:</strong> ${s.avg30d==null?"—":fmt(s.avg30d,2)} &nbsp; • &nbsp;
+            <strong>Δwk:</strong> ${s.deltaWk==null?"Insufficient":((s.deltaWk>=0?"+":"")+fmt(s.deltaWk,2))}<br>
+            <strong>Neg%:</strong> ${fmt(s.negPct30d,1)}% &nbsp; • &nbsp;
+            <strong>Vol:</strong> ${s.vol30d}<br>
+            <strong>Top issue:</strong> ${s.topIssue} &nbsp; • &nbsp; <strong>Top praise:</strong> ${s.topPraise}<br>
+            <strong>Reason:</strong> ${s.reason}
+          </div>
+        `;
+        div.style.cursor = "pointer";
+        div.onclick = () => openStore(s.store_id);
+        cards.appendChild(div);
+      });
+
+      // heatmap
+      const thead = document.querySelector("#heatmapTable thead");
+      const tbody = document.querySelector("#heatmapTable tbody");
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+
+      const stores = (data.stores || []).slice(0, 6);
+      const themeList = data.themeList || [];
+
+      const hr = document.createElement("tr");
+      hr.innerHTML = `<th>Theme</th>` + stores.map(s => `<th>${s.place_name}</th>`).join("");
+      thead.appendChild(hr);
+
+      const byTheme = data.drilldown?.byTheme || {};
+      themeList.forEach(t => {
+        const tr = document.createElement("tr");
+        const cells = stores.map(s => {
+          const arr = (byTheme[t] && byTheme[t][s.store_id]) ? byTheme[t][s.store_id] : [];
+          return { store_id: s.store_id, n: arr.length };
+        });
+
+        tr.innerHTML = `<td><strong>${t}</strong></td>` + cells.map(c => `<td><span class="badge">${c.n}</span></td>`).join("");
+        // click handlers per cell
+        [...tr.querySelectorAll("td")].slice(1).forEach((td, i) => {
+          td.style.cursor = "pointer";
+          td.onclick = () => {
+            const sid = stores[i].store_id;
+            const excerpts = (byTheme[t] && byTheme[t][sid]) ? byTheme[t][sid] : [];
+            document.getElementById("drillTitle").textContent = `Theme: ${t}`;
+            document.getElementById("drillMeta").textContent = `${stores[i].place_name} • ${excerpts.length} excerpts`;
+            document.getElementById("drillBody").innerHTML = excerpts.length
+              ? excerpts.map(e => `• ${e.date} (${e.stars}★) ${e.snippet} ${e.url ? `<a class="link" target="_blank" rel="noopener" href="${e.url}">link</a>` : ""}`).join("<br><br>")
+              : "No excerpts for this theme/store in the selected window.";
+            openModal();
+          };
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // compare tray triggers compare load
+    document.getElementById("compareRun").onclick = loadCompare;
+
+    boot();
+  </script>
+</body>
+</html>
+
+

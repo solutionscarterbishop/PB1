@@ -1,16 +1,5 @@
 // server.js (ESM)
 // PB1 backend: Supabase-powered API for stores, reviews, exec-weekly rollups, and ingest.
-//
-// Run locally:
-//   npm install
-//   npm start
-//
-// Env required:
-//   SUPABASE_URL=...
-//   SUPABASE_SERVICE_ROLE_KEY=...
-//
-// Optional (recommended):
-//   INGEST_TOKEN=some-long-random-string
 
 import express from "express";
 import cors from "cors";
@@ -22,6 +11,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+// CHANGE THIS STRING ANY TIME YOU WANT TO CONFIRM YOU'RE RUNNING THE NEW FILE
+const BUILD = "PB1_SERVER_BUILD__2026-01-16__INGEST_LOCK_UUID_GUARD__V1";
 
 app.set("etag", false);
 app.use(cors());
@@ -50,10 +42,9 @@ const supabase =
 const CFG = {
   STORES_UNIQUE: "stores_unique",
   REVIEWS: "reviews",
-  EXEC_WEEKLY: "exec_weekly",
-  RPC_REFRESH: "refresh_exec_weekly_rollup",
+  EXEC_WEEKLY: "exec_weekly_v2",
 
-  // NEW: raw ingest event store
+  RPC_REFRESH: "refresh_exec_weekly_rollup",
   INGEST_EVENTS: "ingest_events",
 };
 
@@ -80,6 +71,12 @@ function clamp(n, min, max) {
 }
 function sha1(s) {
   return crypto.createHash("sha1").update(String(s)).digest("hex");
+}
+function isUuid(s) {
+  return (
+    typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
+  );
 }
 
 function normalizeStoreRow(r) {
@@ -144,15 +141,60 @@ function requireIngestToken(req, res) {
   return true;
 }
 
+// ---------- simple in-memory rate limiter ----------
+function makeRateLimiter({ windowMs, max, keyFn }) {
+  const hits = new Map(); // key -> { count, resetAt }
+  return function rateLimit(req, res, next) {
+    const now = Date.now();
+    const key = (keyFn ? keyFn(req) : req.ip) || "unknown";
+    const cur = hits.get(key);
+
+    if (!cur || now > cur.resetAt) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      res.setHeader("X-RateLimit-Limit", String(max));
+      res.setHeader("X-RateLimit-Remaining", String(max - 1));
+      res.setHeader("X-RateLimit-Reset", String(now + windowMs));
+      return next();
+    }
+
+    cur.count += 1;
+    res.setHeader("X-RateLimit-Limit", String(max));
+    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, max - cur.count)));
+    res.setHeader("X-RateLimit-Reset", String(cur.resetAt));
+
+    if (cur.count > max) {
+      return res.status(429).json({
+        ok: false,
+        error: "Rate limit exceeded",
+        retry_after_ms: Math.max(0, cur.resetAt - now),
+      });
+    }
+
+    next();
+  };
+}
+
+// Limit per token (best for Zapier/Apify) — not per IP
+const ingestLimiter = makeRateLimiter({
+  windowMs: 60_000, // 1 minute window
+  max: 30,          // 30 requests/minute per token
+  keyFn: (req) => req.headers["x-ingest-token"] || req.ip,
+});
+
 // ---------- health ----------
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+// ---------- build stamp (so we can verify we're running the right file) ----------
+app.get("/api/build", (_req, res) => {
+  res.json({ ok: true, build: BUILD, now: new Date().toISOString() });
+});
 
 // ---------- debug ----------
 app.get("/api/debug", async (_req, res) => {
   try {
     if (!supabase) {
-      return res.json({ ok: false, error: "missing env vars", now: new Date().toISOString() });
+      return res.json({ ok: false, error: "missing env vars", now: new Date().toISOString(), build: BUILD });
     }
 
     const s = await supabase.from("stores").select("id", { count: "exact", head: true });
@@ -161,14 +203,14 @@ app.get("/api/debug", async (_req, res) => {
 
     res.json({
       ok: true,
+      build: BUILD,
       storesCount: s.error ? null : s.count ?? null,
       reviewsCount: r.error ? null : r.count ?? null,
       ingestEventsCount: ie.error ? null : ie.count ?? null,
       now: new Date().toISOString(),
-      server_build: "EXEC_WEEKLY_SHAPE_V2_APIFY_INGEST",
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "debug_error" });
+    res.status(500).json({ ok: false, error: e?.message || "debug_error", build: BUILD });
   }
 });
 
@@ -185,12 +227,13 @@ app.get("/api/stores", async (_req, res) => {
     res.json({
       ok: true,
       signature: "STORES_V1_SHAPE",
+      build: BUILD,
       last_updated: new Date().toISOString(),
       records: rows.length,
       rows,
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "stores_error" });
+    res.status(500).json({ ok: false, error: e?.message || "stores_error", build: BUILD });
   }
 });
 
@@ -213,23 +256,24 @@ app.get("/api/reviews", async (req, res) => {
     res.json({
       ok: true,
       signature: "REVIEWS_V1_SHAPE",
+      build: BUILD,
       last_updated: new Date().toISOString(),
       records: data?.length ?? 0,
       filters: { store_id: store_id || null, source, limit },
       rows: (data ?? []).map(normalizeReviewRow),
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "reviews_error" });
+    res.status(500).json({ ok: false, error: e?.message || "reviews_error", build: BUILD });
   }
 });
 
-// ---------- /api/exec-weekly (RICH SHAPE) ----------
+// ---------- /api/exec-weekly ----------
 app.get("/api/exec-weekly", async (req, res) => {
   try {
     if (!requireSupabase(res)) return;
 
-    const week = norm(req.query.week) || null; // YYYY-MM-DD
-    const store = norm(req.query.store) || null; // store_id
+    const week = norm(req.query.week) || null;
+    const store = norm(req.query.store) || null;
     const source = norm(req.query.source) || null;
 
     let q = supabase.from(CFG.EXEC_WEEKLY).select("*").order("week_ending", { ascending: false });
@@ -240,7 +284,6 @@ app.get("/api/exec-weekly", async (req, res) => {
 
     const { data, error } = await q.limit(2000);
 
-    // If "source" column doesn't exist in exec_weekly, retry without source filter
     if (error && source && (error.message || "").toLowerCase().includes("source")) {
       let q2 = supabase.from(CFG.EXEC_WEEKLY).select("*").order("week_ending", { ascending: false });
       if (week) q2 = q2.eq("week_ending", week);
@@ -257,7 +300,7 @@ app.get("/api/exec-weekly", async (req, res) => {
     sendExecWeekly(res, data ?? [], { week, store, source });
   } catch (e) {
     console.error("❌ /api/exec-weekly error:", e?.message || e);
-    res.status(500).json({ ok: false, error: e?.message || "exec_weekly_error" });
+    res.status(500).json({ ok: false, error: e?.message || "exec_weekly_error", build: BUILD });
   }
 });
 
@@ -286,6 +329,7 @@ function sendExecWeekly(res, rowsRaw, filters) {
   res.json({
     ok: true,
     signature: "EXEC_WEEKLY_V2_SHAPE",
+    build: BUILD,
     last_updated: new Date().toISOString(),
     records: rows.length,
     week_ending,
@@ -337,40 +381,60 @@ app.get("/api/meta", async (_req, res) => {
     res.json({
       ok: true,
       signature: "META_V1_SHAPE",
+      build: BUILD,
       last_updated: new Date().toISOString(),
       weeks,
       sources: sources.length ? sources : ["google"],
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "meta_error" });
+    res.status(500).json({ ok: false, error: e?.message || "meta_error", build: BUILD });
   }
 });
 
-// ---------- INGEST (existing): /api/ingest/reviews ----------
-app.post("/api/ingest/reviews", async (req, res) => {
+// ---------- INGEST (LOCKED): /api/ingest/reviews ----------
+app.post("/api/ingest/reviews", ingestLimiter, async (req, res) => {
+
   try {
     if (!requireSupabase(res)) return;
+    if (!requireIngestToken(req, res)) return;
 
     const reviews = req.body?.reviews || [];
     if (!Array.isArray(reviews) || !reviews.length) {
-      return res.status(400).json({ ok: false, error: "Missing reviews[]" });
+      return res.status(400).json({ ok: false, error: "Missing reviews[]", build: BUILD });
     }
 
     const rows = reviews
-      .map((r) => ({
-        store_id: r.store_id || r.storeId || null,
-        source: r.source || "unknown",
-        reviewer_name: r.reviewer_name || r.reviewerName || null,
-        rating: Number(r.rating ?? r.stars ?? 0) || null,
-        review_text: r.review_text || r.reviewText || null,
-        review_date: r.review_date || r.reviewDate || null,
-        url: r.url || r.reviewUrl || null,
-        external_id:
-          r.external_id ||
-          r.externalId ||
-          sha1(`${r.store_id || r.storeId}|${r.review_date || r.reviewDate}|${r.reviewer_name || r.reviewerName}|${r.review_text || r.reviewText}`),
-      }))
-      .filter((r) => r.external_id);
+      .map((r) => {
+        const store_id = r.store_id || r.storeId || null;
+
+        // Guard: prevent Postgres uuid errors
+        if (!store_id || !isUuid(store_id)) return null;
+
+        return {
+          store_id,
+          source: r.source || "unknown",
+          reviewer_name: r.reviewer_name || r.reviewerName || null,
+          rating: Number(r.rating ?? r.stars ?? 0) || null,
+          review_text: r.review_text || r.reviewText || null,
+          review_date: r.review_date || r.reviewDate || null,
+          url: r.url || r.reviewUrl || null,
+          external_id:
+            r.external_id ||
+            r.externalId ||
+            sha1(
+              `${store_id}|${r.review_date || r.reviewDate}|${r.reviewer_name || r.reviewerName}|${r.review_text || r.reviewText}`
+            ),
+        };
+      })
+      .filter(Boolean);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "No valid rows to ingest (store_id must be a UUID).",
+        build: BUILD,
+      });
+    }
 
     const up = await supabase.from(CFG.REVIEWS).upsert(rows, { onConflict: "external_id" });
     if (up.error) throw up.error;
@@ -380,33 +444,32 @@ app.post("/api/ingest/reviews", async (req, res) => {
     res.json({
       ok: true,
       signature: "INGEST_REVIEWS_V1",
+      build: BUILD,
       last_updated: new Date().toISOString(),
       ingested: rows.length,
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "ingest_error" });
+    res.status(500).json({ ok: false, error: e?.message || "ingest_error", build: BUILD });
   }
 });
 
-// ---------- INGEST (NEW): /api/ingest/apify ----------
-app.post("/api/ingest/apify", async (req, res) => {
+// ---------- INGEST (LOCKED): /api/ingest/apify ----------
+app.post("/api/ingest/apify", ingestLimiter, async (req, res) => {
+
   try {
     if (!requireSupabase(res)) return;
     if (!requireIngestToken(req, res)) return;
 
     const payload = req.body ?? {};
+    if (!payload || typeof payload !== "object") {
+      return res.status(400).json({ ok: false, error: "Invalid payload", build: BUILD });
+    }
+
     const received_at = new Date().toISOString();
 
-    // Always store raw payload for audit/replay
     const ins = await supabase
       .from(CFG.INGEST_EVENTS)
-      .insert([
-        {
-          source: "apify",
-          received_at,
-          payload,
-        },
-      ])
+      .insert([{ source: "apify", received_at, payload }])
       .select("id, received_at")
       .single();
 
@@ -415,23 +478,22 @@ app.post("/api/ingest/apify", async (req, res) => {
     res.json({
       ok: true,
       signature: "INGEST_APIFY_V1",
+      build: BUILD,
       last_updated: received_at,
       ingest_event: ins.data,
-      note: "Stored raw payload into ingest_events.",
     });
   } catch (e) {
     console.error("INGEST_APIFY_ERROR:", e?.message || e);
-    res.status(500).json({ ok: false, error: e?.message || "ingest_apify_error" });
+    res.status(500).json({ ok: false, error: e?.message || "ingest_apify_error", build: BUILD });
   }
 });
 
 // ---------- start ----------
 const server = app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
-  console.log("✅ SERVER BUILD: EXEC_WEEKLY_SHAPE_V2_APIFY_INGEST");
+  console.log("✅ SERVER BUILD:", BUILD);
 });
 
-// Make CTRL+C safer / avoid orphan server
 process.on("SIGINT", () => {
   console.log("\nShutting down...");
   server.close(() => process.exit(0));

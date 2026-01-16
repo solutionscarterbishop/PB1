@@ -16,6 +16,9 @@
       --radius:16px;
       --radius2:14px;
       --glow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 40px rgba(0,0,0,.55);
+      --good: rgba(110,255,180,.18);
+      --warn: rgba(255,205,120,.16);
+      --bad:  rgba(255,120,120,.14);
     }
     *{ box-sizing:border-box; }
     body{
@@ -29,11 +32,22 @@
       color:var(--text);
     }
 
-    .wrap{ max-width: 1220px; margin: 0 auto; }
+    .wrap{ max-width: 1240px; margin: 0 auto; }
 
     h1{ margin:0 0 6px 0; font-size:42px; letter-spacing:-0.5px; }
     .subline{ color:var(--muted); font-size:13px; margin-bottom:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .pill{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,.03); }
+
+    .error-banner{
+      display:none;
+      padding:12px 14px;
+      border:1px solid rgba(255,120,120,.35);
+      border-radius: 12px;
+      background: rgba(255,80,80,.08);
+      color:#ffd7d7;
+      margin: 12px 0 0;
+      font-size:13px;
+    }
 
     .toolbar{
       display:flex; gap:12px; flex-wrap:wrap; align-items:center;
@@ -57,6 +71,10 @@
     input{ width: 220px; }
     button{ cursor:pointer; }
     button:hover{ background:rgba(255,255,255,.06); }
+    .btn-ghost{ background:rgba(255,255,255,.02); }
+    .btn-ghost:hover{ background:rgba(255,255,255,.05); }
+    .btn-primary{ border-color: rgba(255,255,255,.18); background:rgba(255,255,255,.045); }
+    .btn-primary:hover{ background:rgba(255,255,255,.07); }
 
     .grid{
       display:grid;
@@ -112,7 +130,10 @@
       top:0;
       z-index:1;
       white-space: nowrap;
+      user-select:none;
     }
+    thead th.sortable{ cursor:pointer; }
+    thead th.sortable:hover{ background: rgba(255,255,255,.045); }
     tbody td{
       padding:12px 12px;
       border-bottom:1px solid rgba(255,255,255,.06);
@@ -122,6 +143,85 @@
     tbody tr:hover{ background: rgba(255,255,255,.04); }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .right{ text-align:right; }
+
+    /* Executive summary */
+    .exec-grid{
+      display:grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .exec-card{
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      padding:16px;
+      box-shadow: var(--shadow);
+    }
+    .exec-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .exec-title h2{
+      margin:0;
+      font-size:16px;
+      letter-spacing:-0.2px;
+    }
+    .summary{
+      color: rgba(255,255,255,.86);
+      font-size:13px;
+      line-height:1.45;
+      white-space:pre-wrap;
+    }
+    .badge-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.02);
+      font-size:12px;
+      color: rgba(255,255,255,.8);
+    }
+    .barWrap{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+    .barRow{ display:flex; align-items:center; gap:10px; }
+    .barLbl{ width:82px; font-size:12px; color: rgba(255,255,255,.72); }
+    .bar{
+      flex:1;
+      height:10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .bar > span{
+      display:block;
+      height:100%;
+      width:0%;
+      background: rgba(255,255,255,.85);
+    }
+    .barVal{ width:56px; text-align:right; font-size:12px; color: rgba(255,255,255,.72); }
+
+    /* Priority panel */
+    .prioGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .prioTile{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding:12px;
+      background: rgba(255,255,255,.02);
+      min-height:78px;
+    }
+    .prioTop{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+    .prioVal{ font-size:22px; font-weight:800; letter-spacing:-0.2px; }
+    .prioKey{ font-size:12px; color: rgba(255,255,255,.65); }
+    .prioSub{ margin-top:6px; font-size:12px; color: rgba(255,255,255,.7); line-height:1.25; }
 
     /* Reviews */
     .reviews-head{
@@ -151,6 +251,15 @@
     .review-link{ margin-top:10px; font-size:12px; }
     .review-link a{ color:#7af; text-decoration:none; }
     .review-link a:hover{ text-decoration:underline; }
+    .review-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .tag{
+      font-size:11px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.02);
+      color: rgba(255,255,255,.76);
+    }
 
     /* Review Insights / Trend */
     .insights{
@@ -186,7 +295,7 @@
       z-index:50;
     }
     .drawer{
-      width:min(520px, 92vw);
+      width:min(560px, 92vw);
       background: linear-gradient(180deg, rgba(20,20,23,.98), rgba(12,12,15,.98));
       border-left:1px solid var(--border);
       box-shadow: 0 30px 70px rgba(0,0,0,.6);
@@ -194,6 +303,7 @@
       display:flex;
       flex-direction:column;
       gap:14px;
+      overflow:auto;
     }
     .drawer-header{
       display:flex;
@@ -233,10 +343,12 @@
       color:var(--muted);
       font-size:13px;
     }
+    .drawerReviews{ display:flex; flex-direction:column; gap:10px; }
 
     @media (max-width: 980px){
       .grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
       .insights{ grid-template-columns: 1fr; }
+      .exec-grid{ grid-template-columns: 1fr; }
       h1{ font-size:34px; }
       input{ width: 100%; min-width: 220px; }
     }
@@ -251,6 +363,8 @@
       <span class="pill">Loading…</span>
     </div>
 
+    <div class="error-banner" id="errorBanner"></div>
+
     <div class="toolbar">
       <span class="pill mono" id="sig">signature: —</span>
 
@@ -262,17 +376,93 @@
         <select id="storeSelect"></select>
       </label>
 
-      <label class="mono">Source:
+      <label class="mono">Platform:
         <select id="sourceSelect"></select>
       </label>
 
       <input id="storeSearch" class="mono" placeholder="Search stores…" />
 
-      <button id="reloadBtn">Reload</button>
-      <button id="jsonBtn">Show JSON</button>
+      <button id="applyBtn" class="btn-primary">Apply</button>
+      <button id="reloadBtn" class="btn-ghost">Reload</button>
+      <button id="jsonBtn" class="btn-ghost">Show JSON</button>
     </div>
 
-    <!-- Weekly KPIs (existing) -->
+    <!-- Executive Summary + Priority -->
+    <div class="exec-grid">
+      <div class="exec-card">
+        <div class="exec-title">
+          <h2>Executive Summary</h2>
+          <span class="pill mono" id="summaryStamp">—</span>
+        </div>
+        <div class="summary" id="execSummary">Loading summary…</div>
+
+        <div class="badge-row" id="summaryBadges"></div>
+
+        <div class="barWrap" style="margin-top:14px;">
+          <div class="hint mono">Platform mix (current review sample)</div>
+          <div id="platformBars"></div>
+        </div>
+      </div>
+
+      <div class="exec-card">
+        <div class="exec-title">
+          <h2>Priority Panel</h2>
+          <span class="hint mono" id="priorityHint">—</span>
+        </div>
+
+        <div class="prioGrid">
+          <div class="prioTile" id="tileWorst">
+            <div class="prioTop">
+              <div class="prioKey">Lowest Avg Stars</div>
+              <div class="prioVal mono" id="prioWorst">—</div>
+            </div>
+            <div class="prioSub" id="prioWorstSub">—</div>
+          </div>
+
+          <div class="prioTile" id="tileDrop">
+            <div class="prioTop">
+              <div class="prioKey">Biggest Δ Stars Drop</div>
+              <div class="prioVal mono" id="prioDrop">—</div>
+            </div>
+            <div class="prioSub" id="prioDropSub">—</div>
+          </div>
+
+          <div class="prioTile" id="tileSpike">
+            <div class="prioTop">
+              <div class="prioKey">Largest Δ Reviews Spike</div>
+              <div class="prioVal mono" id="prioSpike">—</div>
+            </div>
+            <div class="prioSub" id="prioSpikeSub">—</div>
+          </div>
+
+          <div class="prioTile" id="tileNeg">
+            <div class="prioTop">
+              <div class="prioKey">Neg % (≤2★)</div>
+              <div class="prioVal mono" id="prioNeg">—</div>
+            </div>
+            <div class="prioSub" id="prioNegSub">—</div>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:14px;">
+          <span>Fast Lists</span>
+          <span class="hint">Click a line to filter to that store</span>
+        </div>
+
+        <div class="miniGrid">
+          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
+            <div class="kpi-label">Action Needed (lowest avg)</div>
+            <div class="mono" id="listWorst" style="font-size:12px; line-height:1.4; color:rgba(255,255,255,.82);">—</div>
+          </div>
+          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
+            <div class="kpi-label">Volume Spikes (Δ reviews)</div>
+            <div class="mono" id="listSpikes" style="font-size:12px; line-height:1.4; color:rgba(255,255,255,.82);">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Weekly KPIs -->
     <div class="grid">
       <div class="card">
         <div class="kpi-label">Week Ending</div>
@@ -283,7 +473,7 @@
         <div class="kpi-value" id="kpiStores">—</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Total Reviews (Selected Week)</div>
+        <div class="kpi-label">Total Reviews (Selected)</div>
         <div class="kpi-value" id="kpiReviews">—</div>
       </div>
       <div class="card">
@@ -301,15 +491,15 @@
       <table>
         <thead>
           <tr>
-            <th>Week Ending</th>
-            <th>Store</th>
-            <th>City</th>
-            <th>State</th>
-            <th class="right">Total Reviews</th>
-            <th class="right">Avg Stars</th>
-            <th class="right">Δ Reviews</th>
-            <th class="right">Δ Stars</th>
-            <th>Source</th>
+            <th class="sortable" data-sort="week">Week Ending</th>
+            <th class="sortable" data-sort="store">Store</th>
+            <th class="sortable" data-sort="city">City</th>
+            <th class="sortable" data-sort="state">State</th>
+            <th class="right sortable" data-sort="total">Total Reviews</th>
+            <th class="right sortable" data-sort="avg">Avg Stars</th>
+            <th class="right sortable" data-sort="dReviews">Δ Reviews</th>
+            <th class="right sortable" data-sort="dStars">Δ Stars</th>
+            <th class="sortable" data-sort="source">Platform</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -317,10 +507,10 @@
       <div class="empty" id="emptyState" style="display:none;"></div>
     </div>
 
-    <!-- NEW: Review insights + trend chart -->
+    <!-- Review insights + trend chart -->
     <div class="section-title" style="margin-top:18px;">
-      <span>Store Review Insights</span>
-      <span class="hint mono">Powered by /api/reviews (filtered by store + source)</span>
+      <span>Review Insights</span>
+      <span class="hint mono">Powered by /api/reviews (filtered by store + platform)</span>
     </div>
 
     <div class="insights">
@@ -359,7 +549,7 @@
       </div>
     </div>
 
-    <!-- Reviews (existing, kept) -->
+    <!-- Reviews -->
     <div class="reviews-head">
       <div style="font-weight:700;">Recent Reviews</div>
       <div id="reviewsMeta" style="font-size:12px; color:#aaa;"></div>
@@ -398,6 +588,11 @@
           <div class="mono muted" id="dRows">—</div>
           <div class="links mono muted" id="dLinks"></div>
         </div>
+
+        <div class="chart">
+          <div class="kpi-label">Latest Reviews (this store • platform filter)</div>
+          <div class="drawerReviews" id="drawerReviews"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -409,19 +604,23 @@
         ? "http://localhost:10000"
         : "https://pb1-t52r.onrender.com";
 
-    const EXEC_URL   = `${API_BASE}/api/exec-weekly`;
-    const META_URL   = `${API_BASE}/api/meta`;
-    const STORES_URL = `${API_BASE}/api/stores`;
-    const REVIEWS_URL= `${API_BASE}/api/reviews`;
+    const EXEC_URL    = `${API_BASE}/api/exec-weekly`;
+    const META_URL    = `${API_BASE}/api/meta`;
+    const STORES_URL  = `${API_BASE}/api/stores`;
+    const REVIEWS_URL = `${API_BASE}/api/reviews`;
 
     const $ = (id) => document.getElementById(id);
 
     const sigEl = $("sig");
     const sublineEl = $("subline");
+    const errorBanner = $("errorBanner");
+
     const weekSelect = $("weekSelect");
     const storeSelect = $("storeSelect");
     const sourceSelect = $("sourceSelect");
     const storeSearch = $("storeSearch");
+    const applyBtn = $("applyBtn");
+
     const tbody = $("tbody");
     const emptyState = $("emptyState");
     const hintEl = $("hint");
@@ -429,7 +628,26 @@
     const reviewsList = $("reviewsList");
     const reviewsMeta = $("reviewsMeta");
 
-    // NEW insight elements
+    // Summary/priority
+    const execSummaryEl = $("execSummary");
+    const summaryStampEl = $("summaryStamp");
+    const summaryBadgesEl = $("summaryBadges");
+    const platformBarsEl = $("platformBars");
+
+    const priorityHintEl = $("priorityHint");
+    const prioWorst = $("prioWorst");
+    const prioWorstSub = $("prioWorstSub");
+    const prioDrop = $("prioDrop");
+    const prioDropSub = $("prioDropSub");
+    const prioSpike = $("prioSpike");
+    const prioSpikeSub = $("prioSpikeSub");
+    const prioNeg = $("prioNeg");
+    const prioNegSub = $("prioNegSub");
+
+    const listWorst = $("listWorst");
+    const listSpikes = $("listSpikes");
+
+    // Insight elements
     const trendCanvas = $("trendCanvas");
     const kpiTotalReviews = $("kpiTotalReviews");
     const kpiAvgRating = $("kpiAvgRating");
@@ -442,8 +660,26 @@
 
     let META = null;
     let STORES = [];
-    let LAST_JSON = null;
+    let LAST_EXEC = null;
+    let LAST_REVIEWS = null;
 
+    // Table sorting state
+    let sortKey = "avg";
+    let sortDir = "asc"; // asc/desc
+
+    function showError(msg){
+      errorBanner.style.display = "block";
+      errorBanner.textContent = msg;
+    }
+    function clearError(){
+      errorBanner.style.display = "none";
+      errorBanner.textContent = "";
+    }
+
+    function safeNum(v, fallback=0){
+      const x = Number(v);
+      return Number.isFinite(x) ? x : fallback;
+    }
     function fmt(n){
       const x = Number(n);
       if (Number.isNaN(x)) return "—";
@@ -472,7 +708,6 @@
       const r = Math.max(0, Math.min(5, Number(n) || 0));
       return "★★★★★".slice(0, r) + "☆☆☆☆☆".slice(0, 5 - r);
     }
-
     function parseDateSafe(d){
       if (!d) return null;
       const t = Date.parse(d);
@@ -525,15 +760,27 @@
       }
     }
 
+    // Store label for /api/stores rows
     function storeLabel(s){
-      const name = s.store_name || s.name || "Unknown Store";
-      const city = s.city || "";
-      const state = normalizeState(s.state || "");
+      if (s?.label) return String(s.label);
+      const name = s?.name || s?.store_name || s?.place_name || "Unknown Store";
+      const city = s?.city || "";
+      const state = normalizeState(s?.state || "");
       const parts = [name, city, state].filter(Boolean);
       return parts.join(" • ");
     }
 
+    function rowStoreText(row){
+      const name = row.store ?? row.store_name ?? row.place_name ?? "Store";
+      const city = row.city ?? "";
+      const state = normalizeState(row.state ?? "");
+      const src = (row.source ?? "").toString();
+      const base = [name, city, state].filter(Boolean).join(" • ");
+      return src ? `${base} • ${src}` : base;
+    }
+
     async function loadStores(){
+      console.log(`GET ${STORES_URL}`);
       const json = await fetchJSON(STORES_URL);
       if (!json.ok) throw new Error(json.error || "stores failed");
       STORES = json.rows || [];
@@ -541,7 +788,7 @@
 
       populateSelect(storeSelect, STORES, {
         includeAllLabel: "All stores",
-        valueFn: (s) => s.store_id || s.id || "",
+        valueFn: (s) => s.id || s.store_id || "",
         labelFn: (s) => storeLabel(s)
       });
 
@@ -550,37 +797,62 @@
     }
 
     async function loadMeta(){
+      console.log(`GET ${META_URL}`);
       const json = await fetchJSON(META_URL);
       if (!json.ok) throw new Error(json.error || "meta failed");
       META = json;
 
-      populateSelect(weekSelect, META.weeks || [], { includeAllLabel: null });
-      populateSelect(sourceSelect, META.sources || ["google"], { includeAllLabel: "All sources" });
+      populateSelect(weekSelect, META.weeks || [], { includeAllLabel: "Latest (all weeks)" });
+      populateSelect(sourceSelect, META.sources || ["google"], { includeAllLabel: "All platforms" });
 
-      if (META.weeks?.length) weekSelect.value = META.weeks[0];
+      weekSelect.value = "";
       sourceSelect.value = "";
     }
 
-    async function loadExecWeekly(){
-      const week = weekSelect.value;
-      const source = sourceSelect.value;
-      const storeId = storeSelect.value;
+    function applyStoreSearch(){
+      const q = (storeSearch.value || "").trim().toLowerCase();
+      const list = q
+        ? STORES.filter(s => {
+            const label = storeLabel(s).toLowerCase();
+            const name  = (s.name || "").toLowerCase();
+            const city  = (s.city || "").toLowerCase();
+            const state = (s.state || "").toLowerCase();
+            return label.includes(q) || name.includes(q) || city.includes(q) || state.includes(q);
+          }).slice(0, 400)
+        : STORES;
+
+      const prev = storeSelect.value;
+      populateSelect(storeSelect, list, {
+        includeAllLabel: "All stores",
+        valueFn: (s) => s.id || s.store_id || "",
+        labelFn: (s) => storeLabel(s)
+      });
+      if ([...storeSelect.options].some(o => o.value === prev)) storeSelect.value = prev;
+    }
+
+    // Unified dashboard loader
+    async function loadDashboard({ store, week } = {}){
+      const storeId = store ?? storeSelect.value;
+      const weekVal = week ?? weekSelect.value;
+      const source  = sourceSelect.value;
 
       const qs = new URLSearchParams();
-      if (week) qs.set("week", week);
-      if (source) qs.set("source", source);
+      if (weekVal) qs.set("week", weekVal);
       if (storeId) qs.set("store", storeId);
+      if (source) qs.set("source", source);
 
-      const url = `${EXEC_URL}?${qs.toString()}`;
+      const url = qs.toString() ? `${EXEC_URL}?${qs.toString()}` : EXEC_URL;
+
+      console.log(`GET ${url}`);
       const json = await fetchJSON(url);
-      LAST_JSON = json;
+      LAST_EXEC = json;
 
       sigEl.textContent = `signature: ${json.signature || "—"}`;
 
       const extra = [];
       if (storeId){
-        const selected = STORES.find(s => (s.store_id || s.id) === storeId);
-        if (selected) extra.push(`store=${(selected.store_name || selected.name || "store").slice(0,24)}`);
+        const selected = STORES.find(s => (s.id || s.store_id) === storeId);
+        if (selected) extra.push(`store=${(selected.name || selected.store_name || "store").slice(0,24)}`);
       }
       extra.push(`stores_in_db=${STORES.length}`);
 
@@ -592,51 +864,73 @@
       });
 
       const k = json.kpis || {};
-      $("kpiWeek").textContent = (json.week_ending || week || "—");
+      $("kpiWeek").textContent = (json.week_ending || weekVal || "—");
       $("kpiStores").textContent = fmt(k.stores_reporting ?? 0);
       $("kpiReviews").textContent = fmt(k.total_reviews ?? 0);
       $("kpiAvgStars").textContent = fmt2(k.avg_stars_overall ?? 0);
 
+      // Table render with sorting
       renderTable(json.rows || []);
+
+      // Priority panel derived from weekly rollup
+      renderPriorityPanel(json);
+    }
+
+    function normalizeRow(r){
+      return {
+        raw: r,
+        week: r.week_ending ?? r.week ?? "",
+        store: r.store ?? r.store_name ?? r.place_name ?? "",
+        city: r.city ?? "",
+        state: r.state ?? "",
+        total: safeNum(r.total_reviews ?? r.total, 0),
+        avg: safeNum(r.avg_stars ?? r.avg_rating, 0),
+        dReviews: safeNum(r.delta_reviews ?? r.delta_total_reviews ?? r.rating_change, 0),
+        dStars: safeNum(r.delta_stars ?? r.delta_avg_stars, 0),
+        source: (r.source ?? "").toString()
+      };
     }
 
     function renderTable(rows){
       tbody.innerHTML = "";
 
       const week = weekSelect.value;
-      const filtered = week ? rows.filter(r => (r.week_ending || r.week) === week) : rows;
+      let filtered = rows.map(normalizeRow);
+
+      if (week){
+        filtered = filtered.filter(x => x.week === week);
+      }
+
+      // Sort
+      filtered.sort((a,b) => {
+        const dir = (sortDir === "asc") ? 1 : -1;
+        const ak = a[sortKey], bk = b[sortKey];
+        // number vs string
+        if (typeof ak === "number" && typeof bk === "number") return (ak - bk) * dir;
+        return String(ak ?? "").localeCompare(String(bk ?? "")) * dir;
+      });
 
       if (!filtered.length){
         emptyState.style.display = "block";
-        emptyState.textContent =
-          "No weekly rows for the current selection. This is expected if the selected store has not reported reviews yet in exec_weekly.";
+        emptyState.textContent = "No weekly rows for the current selection (store/week/platform).";
       } else {
         emptyState.style.display = "none";
       }
 
-      for (const r of filtered){
+      for (const x of filtered){
+        const r = x.raw;
         const tr = document.createElement("tr");
 
-        const weekVal = r.week_ending ?? r.week ?? "—";
-        const storeVal = r.store ?? r.store_name ?? "—";
-        const cityVal = r.city ?? "";
-        const stateVal = r.state ?? "";
-        const totalReviews = r.total_reviews ?? r.total ?? 0;
-        const avgStars = r.avg_stars ?? r.avg_rating ?? 0;
-        const dReviews = r.delta_reviews ?? r.delta_total_reviews ?? r.rating_change ?? 0;
-        const dStars = r.delta_stars ?? r.delta_avg_stars ?? 0;
-        const src = (r.source ?? "google").toString();
-
         const cells = [
-          weekVal,
-          storeVal,
-          cityVal,
-          stateVal,
-          { v: fmt(totalReviews), cls: "right mono" },
-          { v: fmt2(avgStars), cls: "right mono" },
-          { v: fmt(dReviews), cls: "right mono" },
-          { v: fmt(dStars), cls: "right mono" },
-          src
+          x.week || "—",
+          x.store || "—",
+          x.city,
+          x.state,
+          { v: fmt(x.total), cls: "right mono" },
+          { v: fmt2(x.avg), cls: "right mono" },
+          { v: fmt(x.dReviews), cls: "right mono" },
+          { v: fmt2(x.dStars), cls: "right mono" },
+          x.source || "—"
         ];
 
         for (const c of cells){
@@ -655,49 +949,67 @@
       }
     }
 
-    function openDrawer(row){
-      const backdrop = $("drawerBackdrop");
-      const title = $("drawerTitle");
-      const subtitle = $("drawerSubtitle");
+    function renderPriorityPanel(execJson){
+      const rows = (execJson?.rows || []).map(normalizeRow);
 
-      title.textContent = (row.store ?? row.store_name ?? "Store");
-
-      const storeId = row.store_id || null;
-      const match = storeId ? STORES.find(s => (s.store_id || s.id) === storeId) : null;
-      subtitle.textContent = match ? storeLabel(match) : `${row.city || ""} ${row.state || ""}`.trim() || "—";
-
-      const weekVal = row.week_ending ?? row.week ?? "—";
-      $("dReviews").textContent = fmt(row.total_reviews ?? 0);
-      $("dAvg").textContent = fmt2(row.avg_stars ?? row.avg_rating ?? 0);
-
-      const all = (LAST_JSON?.rows || []).filter(r => {
-        if (row.store_id && r.store_id) return r.store_id === row.store_id;
-        return (r.store_name === row.store_name) && (r.state === row.state);
-      });
-
-      const series = all
-        .map(r => ({ w: r.week_ending ?? r.week, avg: Number(r.avg_stars ?? r.avg_rating ?? 0) || 0 }))
-        .filter(x => x.w)
-        .sort((a,b) => (a.w > b.w ? 1 : -1));
-
-      const last = series.slice(-8);
-      $("dRows").textContent = `points=${last.length} • latest_week=${weekVal}`;
-
-      const linksEl = $("dLinks");
-      linksEl.innerHTML = "";
-      const urls = (all.map(r => r.review_url || r.reviewUrl).filter(Boolean)).slice(0,3);
-      if (urls.length){
-        linksEl.innerHTML = urls.map(u => `<div>• <a target="_blank" rel="noreferrer" href="${escapeHtml(u)}">review link</a></div>`).join("");
-      } else {
-        linksEl.textContent = "(no review links in rollup yet)";
+      if (!rows.length){
+        priorityHintEl.textContent = "no weekly rows";
+        prioWorst.textContent = "—"; prioWorstSub.textContent = "—";
+        prioDrop.textContent = "—";  prioDropSub.textContent = "—";
+        prioSpike.textContent = "—"; prioSpikeSub.textContent = "—";
+        return;
       }
 
-      drawSpark(last.map(x => x.avg));
+      // lowest avg
+      const worst = [...rows].sort((a,b) => a.avg - b.avg)[0];
+      prioWorst.textContent = fmt2(worst.avg);
+      prioWorstSub.textContent = rowStoreText(worst.raw);
 
-      backdrop.style.display = "flex";
-      backdrop.addEventListener("click", (e) => {
-        if (e.target === backdrop) closeDrawer();
-      }, { once:true });
+      // biggest star drop (most negative)
+      const drop = [...rows].sort((a,b) => a.dStars - b.dStars)[0];
+      prioDrop.textContent = fmt2(drop.dStars);
+      prioDropSub.textContent = rowStoreText(drop.raw);
+
+      // biggest review spike (most positive)
+      const spike = [...rows].sort((a,b) => b.dReviews - a.dReviews)[0];
+      prioSpike.textContent = fmt(spike.dReviews);
+      prioSpikeSub.textContent = rowStoreText(spike.raw);
+
+      // lists
+      const worstList = [...rows].sort((a,b) => a.avg - b.avg).slice(0,10);
+      const spikeList = [...rows].sort((a,b) => b.dReviews - a.dReviews).slice(0,10);
+
+      listWorst.innerHTML = worstList.map(r => {
+        const line = `${escapeHtml(rowStoreText(r.raw))} — ${fmt2(r.avg)}★`;
+        return `<span class="mono" style="cursor:pointer" data-store="${escapeHtml(r.raw.store_id || "")}">• ${line}</span>`;
+      }).join("<br>") || "—";
+
+      listSpikes.innerHTML = spikeList.map(r => {
+        const line = `${escapeHtml(rowStoreText(r.raw))} — Δ ${fmt(r.dReviews)} reviews`;
+        return `<span class="mono" style="cursor:pointer" data-store="${escapeHtml(r.raw.store_id || "")}">• ${line}</span>`;
+      }).join("<br>") || "—";
+
+      // click-to-filter from lists
+      for (const el of listWorst.querySelectorAll("[data-store]")){
+        el.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sid = el.getAttribute("data-store") || "";
+          if (!sid) return;
+          storeSelect.value = sid;
+          await runApply();
+        });
+      }
+      for (const el of listSpikes.querySelectorAll("[data-store]")){
+        el.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sid = el.getAttribute("data-store") || "";
+          if (!sid) return;
+          storeSelect.value = sid;
+          await runApply();
+        });
+      }
+
+      priorityHintEl.textContent = `rows=${rows.length}`;
     }
 
     function closeDrawer(){
@@ -761,20 +1073,96 @@
       svg.appendChild(t);
     }
 
-    function applyStoreSearch(){
-      const q = (storeSearch.value || "").trim().toLowerCase();
-      const list = q
-        ? STORES.filter(s => storeLabel(s).toLowerCase().includes(q)).slice(0, 200)
-        : STORES;
+    async function openDrawer(row){
+      const backdrop = $("drawerBackdrop");
+      const title = $("drawerTitle");
+      const subtitle = $("drawerSubtitle");
+      const drawerReviews = $("drawerReviews");
 
-      const prev = storeSelect.value;
-      populateSelect(storeSelect, list, {
-        includeAllLabel: "All stores",
-        valueFn: (s) => s.store_id || s.id || "",
-        labelFn: (s) => storeLabel(s)
+      title.textContent = (row.store ?? row.store_name ?? row.place_name ?? "Store");
+
+      const storeId = row.store_id || null;
+      const match = storeId ? STORES.find(s => (s.id || s.store_id) === storeId) : null;
+      subtitle.textContent = match ? storeLabel(match) : `${row.city || ""} ${row.state || ""}`.trim() || "—";
+
+      const weekVal = row.week_ending ?? row.week ?? "—";
+      $("dReviews").textContent = fmt(row.total_reviews ?? 0);
+      $("dAvg").textContent = fmt2(row.avg_stars ?? row.avg_rating ?? 0);
+
+      const all = (LAST_EXEC?.rows || []).filter(r => {
+        if (row.store_id && r.store_id) return r.store_id === row.store_id;
+        return (r.store_name === row.store_name) && (r.state === row.state);
       });
-      // try to keep selection if still present
-      if ([...storeSelect.options].some(o => o.value === prev)) storeSelect.value = prev;
+
+      const series = all
+        .map(r => ({ w: r.week_ending ?? r.week, avg: Number(r.avg_stars ?? r.avg_rating ?? 0) || 0 }))
+        .filter(x => x.w)
+        .sort((a,b) => (a.w > b.w ? 1 : -1));
+
+      const last = series.slice(-8);
+      $("dRows").textContent = `points=${last.length} • latest_week=${weekVal}`;
+
+      const linksEl = $("dLinks");
+      linksEl.innerHTML = "";
+      const urls = (all.map(r => r.review_url || r.reviewUrl).filter(Boolean)).slice(0,3);
+      if (urls.length){
+        linksEl.innerHTML = urls.map(u => `<div>• <a target="_blank" rel="noreferrer" href="${escapeHtml(u)}">review link</a></div>`).join("");
+      } else {
+        linksEl.textContent = "(no review links in weekly rollup)";
+      }
+
+      drawSpark(last.map(x => x.avg));
+
+      // Drawer reviews (live fetch for this store, respects platform filter)
+      drawerReviews.innerHTML = `<div class="empty">Loading store reviews…</div>`;
+      try{
+        const source = sourceSelect.value;
+        const qs = new URLSearchParams();
+        qs.set("limit","8");
+        if (storeId) qs.set("store_id", storeId);
+        if (source) qs.set("source", source);
+
+        const url = `${REVIEWS_URL}?${qs.toString()}`;
+        console.log(`GET ${url}`);
+        const json = await fetchJSON(url);
+
+        if (!json.ok){
+          drawerReviews.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(json.error || "Unknown error")}</div>`;
+        } else {
+          const rows = json.rows || [];
+          if (!rows.length){
+            drawerReviews.innerHTML = `<div class="empty">No reviews found for this store/platform filter.</div>`;
+          } else {
+            drawerReviews.innerHTML = rows.map(r => {
+              const date = r.review_date ? escapeHtml(r.review_date) : "";
+              const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
+              const src = r.source ? escapeHtml(r.source) : "";
+              const txt = r.review_text ? escapeHtml(r.review_text) : "";
+              const link = r.url ? escapeHtml(r.url) : "";
+              return `
+                <div class="review-card">
+                  <div class="review-top">
+                    <div>
+                      <div class="review-name">${who}</div>
+                      <div class="review-meta">${date}${src ? ` • <span style="color:#8ad;">${src}</span>` : ""}</div>
+                    </div>
+                    <div class="review-stars">${stars(r.rating)}</div>
+                  </div>
+                  <div class="review-text">${txt || "<span style='color:#666;'>No text</span>"}</div>
+                  ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer">Open review</a></div>` : ""}
+                </div>
+              `;
+            }).join("");
+          }
+        }
+      }catch(e){
+        drawerReviews.innerHTML = `<div class="empty">Error: ${escapeHtml(String(e.message || e))}</div>`;
+      }
+
+      backdrop.style.display = "flex";
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) closeDrawer();
+      }, { once:true });
     }
 
     function updateReviewInsights(rows, storeLabelText){
@@ -803,6 +1191,10 @@
       kpiLast14Sub.textContent = `cutoff: ${cutoff.toLocaleDateString()}`;
       kpiNegPctSub.textContent = ratings.length ? `${negCount} / ${ratings.length} reviews` : "no ratings found";
 
+      // for priority tile
+      prioNeg.textContent = ratings.length ? `${negPct.toFixed(0)}%` : "—";
+      prioNegSub.textContent = ratings.length ? `${negCount} negatives out of ${ratings.length} rated` : "no rated reviews";
+
       drawTrendCanvas(rows);
     }
 
@@ -812,10 +1204,8 @@
       const ctx = c.getContext("2d");
       if (!ctx) return;
 
-      // clear
       ctx.clearRect(0,0,c.width,c.height);
 
-      // prep points (sorted by date)
       const pts = rows
         .map(r => {
           const d = parseDateSafe(r.review_date);
@@ -825,10 +1215,8 @@
         .filter(p => p.d && p.y > 0)
         .sort((a,b) => a.d - b.d);
 
-      // cap to latest 60 points for readability
-      const capped = pts.slice(-60);
+      const capped = pts.slice(-70);
 
-      // background subtle grid
       const W = c.width, H = c.height;
       const padL = 36, padR = 14, padT = 14, padB = 28;
       const plotW = W - padL - padR;
@@ -837,13 +1225,11 @@
       ctx.globalAlpha = 1;
       ctx.lineWidth = 1;
 
-      // axes labels (simple)
       ctx.fillStyle = "rgba(255,255,255,.55)";
       ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
       ctx.fillText("5★", 8, padT + 6);
       ctx.fillText("1★", 8, padT + plotH);
 
-      // horizontal grid lines for 1..5
       for (let s=1; s<=5; s++){
         const y = padT + plotH * (1 - (s-1)/4);
         ctx.strokeStyle = "rgba(255,255,255,.08)";
@@ -869,7 +1255,6 @@
         return padT + plotH * (1 - t);
       };
 
-      // line
       ctx.strokeStyle = "rgba(255,255,255,.85)";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -881,17 +1266,15 @@
       });
       ctx.stroke();
 
-      // points
       ctx.fillStyle = "rgba(255,255,255,.90)";
       capped.forEach((p,i) => {
         const x = toX(i);
         const y = toY(p.y);
         ctx.beginPath();
-        ctx.arc(x, y, 3.2, 0, Math.PI*2);
+        ctx.arc(x, y, 3.0, 0, Math.PI*2);
         ctx.fill();
       });
 
-      // bottom date range
       const first = capped[0].d;
       const last  = capped[capped.length - 1].d;
       ctx.fillStyle = "rgba(255,255,255,.55)";
@@ -899,48 +1282,158 @@
       ctx.fillText(`${first.toLocaleDateString()} → ${last.toLocaleDateString()} • points=${capped.length}`, padL, H - 10);
     }
 
+    function computePlatformMix(rows){
+      const counts = new Map();
+      for (const r of rows || []){
+        const s = (r.source || "unknown").toString().trim() || "unknown";
+        counts.set(s, (counts.get(s) || 0) + 1);
+      }
+      const arr = Array.from(counts.entries()).map(([k,v]) => ({ k, v }))
+        .sort((a,b) => b.v - a.v);
+      return arr;
+    }
+
+    function renderPlatformBars(mix){
+      platformBarsEl.innerHTML = "";
+      if (!mix.length){
+        platformBarsEl.innerHTML = `<div class="empty">No reviews loaded yet.</div>`;
+        return;
+      }
+      const total = mix.reduce((a,b)=>a+b.v,0) || 1;
+
+      for (const m of mix.slice(0,8)){
+        const pct = Math.round((m.v / total) * 100);
+        const row = document.createElement("div");
+        row.className = "barRow";
+        row.innerHTML = `
+          <div class="barLbl mono">${escapeHtml(m.k)}</div>
+          <div class="bar"><span style="width:${pct}%"></span></div>
+          <div class="barVal mono">${pct}%</div>
+        `;
+        platformBarsEl.appendChild(row);
+      }
+    }
+
+    function renderExecutiveSummary(execJson, reviewsJson){
+      const now = new Date();
+      summaryStampEl.textContent = now.toLocaleTimeString();
+
+      const k = execJson?.kpis || {};
+      const stores = safeNum(k.stores_reporting, 0);
+      const total = safeNum(k.total_reviews, 0);
+      const avgStars = safeNum(k.avg_stars_overall, 0);
+
+      const reviewRows = reviewsJson?.rows || [];
+      const ratings = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
+      const avgReview = ratings.length ? (ratings.reduce((a,b)=>a+b,0) / ratings.length) : 0;
+      const negCount = ratings.filter(x => x <= 2).length;
+      const negPct = ratings.length ? (negCount / ratings.length) * 100 : 0;
+
+      const worst = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.avg - b.avg)[0];
+      const drop = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.dStars - b.dStars)[0];
+
+      const weekText = execJson?.week_ending || (weekSelect.value || "latest");
+      const platformText = sourceSelect.value ? sourceSelect.value : "all platforms";
+      const storeText = storeSelect.value
+        ? (STORES.find(s => (s.id || s.store_id) === storeSelect.value)?.name || "selected store")
+        : "all stores";
+
+      const lines = [];
+      lines.push(`Scope: ${storeText} • ${platformText} • week=${weekText}`);
+      lines.push("");
+      lines.push(`Headline: ${fmt(stores)} stores reporting • ${fmt(total)} reviews • weighted avg ${fmt2(avgStars)}★`);
+      if (ratings.length){
+        lines.push(`Live review sample: ${fmt(ratings.length)} rated reviews • avg ${fmt2(avgReview)}★ • negative ${negPct.toFixed(0)}% (≤2★)`);
+      } else {
+        lines.push(`Live review sample: no rated reviews returned for the current filters.`);
+      }
+      lines.push("");
+      if (worst){
+        lines.push(`Primary risk: lowest avg store at ${fmt2(worst.avg)}★ → ${rowStoreText(worst.raw)}`);
+      }
+      if (drop){
+        lines.push(`Momentum risk: largest Δ stars drop ${fmt2(drop.dStars)}★ → ${rowStoreText(drop.raw)}`);
+      }
+      lines.push("");
+      lines.push(`Recommended next move: click the risk store row → open drawer → read latest reviews → assign action (ops fix, staffing, product issue, or platform response).`);
+
+      execSummaryEl.textContent = lines.join("\n");
+
+      // badges
+      summaryBadgesEl.innerHTML = "";
+      const badges = [
+        { t: `stores_reporting=${fmt(stores)}` },
+        { t: `reviews=${fmt(total)}` },
+        { t: `weighted_avg=${fmt2(avgStars)}★` },
+        ratings.length ? { t: `neg=${negPct.toFixed(0)}%` } : null
+      ].filter(Boolean);
+
+      for (const b of badges){
+        const el = document.createElement("span");
+        el.className = "badge mono";
+        el.textContent = b.t;
+        summaryBadgesEl.appendChild(el);
+      }
+
+      // platform mix
+      const mix = computePlatformMix(reviewRows);
+      renderPlatformBars(mix);
+    }
+
     async function loadReviews(){
-      const store_id = storeSelect.value;   // UUID
+      const store_id = storeSelect.value;
       const source = sourceSelect.value;
 
       const qs = new URLSearchParams();
-      qs.set("limit", "50");
+      qs.set("limit", "60");
       if (store_id) qs.set("store_id", store_id);
       if (source) qs.set("source", source);
 
       const url = `${REVIEWS_URL}?${qs.toString()}`;
+      console.log(`GET ${url}`);
+
       const json = await fetchJSON(url);
+      LAST_REVIEWS = json;
 
       if (!json.ok){
         reviewsMeta.textContent = "Failed to load reviews";
         reviewsList.innerHTML = `<div class="empty">${escapeHtml(json.error || "Unknown error")}</div>`;
-        // clear insight KPIs
         updateReviewInsights([], "—");
+        showError(`Reviews failed: ${json.error || "Unknown error"}`);
         return;
       }
 
       const storeLabelText = store_id
-        ? (STORES.find(s => (s.store_id || s.id) === store_id)?.store_name || "Selected store")
+        ? (STORES.find(s => (s.id || s.store_id) === store_id)?.name || "Selected store")
         : "All stores";
 
-      reviewsMeta.textContent = `${storeLabelText} • records=${json.records} • limit=${json.filters?.limit ?? ""}`;
+      const plat = source ? source : "all platforms";
+      reviewsMeta.textContent = `${storeLabelText} • ${plat} • records=${json.records} • limit=${json.filters?.limit ?? ""}`;
 
       const rows = json.rows || [];
 
-      // NEW: update KPIs + chart
       updateReviewInsights(rows, storeLabelText);
+
+      // executive summary uses BOTH exec+reviews
+      if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, json);
 
       if (!rows.length){
         reviewsList.innerHTML = `<div class="empty">No reviews found for this filter.</div>`;
         return;
       }
 
-      reviewsList.innerHTML = rows.map(r => {
+      reviewsList.innerHTML = rows.slice(0, 18).map(r => {
         const date = r.review_date ? escapeHtml(r.review_date) : "";
         const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
         const src = r.source ? escapeHtml(r.source) : "";
         const txt = r.review_text ? escapeHtml(r.review_text) : "";
         const link = r.url ? escapeHtml(r.url) : "";
+        const rating = safeNum(r.rating ?? r.stars, 0);
+
+        const tags = [];
+        if (src) tags.push(`<span class="tag mono">${src}</span>`);
+        if (rating) tags.push(`<span class="tag mono">${rating.toFixed(0)}★</span>`);
+        if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
 
         return `
           <div class="review-card">
@@ -949,9 +1442,10 @@
                 <div class="review-name">${who}</div>
                 <div class="review-meta">${date}${src ? ` • <span style="color:#8ad;">${src}</span>` : ""}</div>
               </div>
-              <div class="review-stars">${stars(r.rating)}</div>
+              <div class="review-stars">${stars(rating)}</div>
             </div>
 
+            <div class="review-tags">${tags.join("")}</div>
             <div class="review-text">${txt || "<span style='color:#666;'>No text</span>"}</div>
             ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer">Open review</a></div>` : ""}
           </div>
@@ -959,16 +1453,30 @@
       }).join("");
     }
 
+    async function runApply(){
+      try{
+        clearError();
+        await loadDashboard({ store: storeSelect.value, week: weekSelect.value });
+        await loadReviews();
+      }catch(e){
+        showError(String(e.message || e));
+      }
+    }
+
     // Events
     $("reloadBtn").addEventListener("click", async () => {
-      await loadStores();
-      await loadMeta();
-      await loadExecWeekly();
-      await loadReviews();
+      try{
+        clearError();
+        await loadStores();
+        await loadMeta();
+        await runApply();
+      }catch(e){
+        showError(String(e.message || e));
+      }
     });
 
     $("jsonBtn").addEventListener("click", () => {
-      const pretty = JSON.stringify(LAST_JSON, null, 2);
+      const pretty = JSON.stringify({ exec: LAST_EXEC, reviews: LAST_REVIEWS }, null, 2);
       const w = window.open("", "_blank");
       w.document.write(`<pre style="white-space:pre-wrap;font-family:ui-monospace">${pretty.replaceAll("<","&lt;")}</pre>`);
       w.document.close();
@@ -976,33 +1484,42 @@
 
     $("drawerClose").addEventListener("click", closeDrawer);
 
-    weekSelect.addEventListener("change", loadExecWeekly);
-    storeSelect.addEventListener("change", async () => { await loadExecWeekly(); await loadReviews(); });
-    sourceSelect.addEventListener("change", async () => { await loadExecWeekly(); await loadReviews(); });
+    // Auto-apply changes
+    weekSelect.addEventListener("change", runApply);
+    storeSelect.addEventListener("change", runApply);
+    sourceSelect.addEventListener("change", runApply);
+    storeSearch.addEventListener("input", applyStoreSearch);
+    applyBtn.addEventListener("click", runApply);
 
-    storeSearch.addEventListener("input", () => {
-      applyStoreSearch();
+    // Sorting handlers
+    document.querySelectorAll("thead th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.getAttribute("data-sort");
+        if (!key) return;
+        if (sortKey === key){
+          sortDir = (sortDir === "asc") ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          // default sort direction by type
+          sortDir = (["store","city","state","source","week"].includes(key)) ? "asc" : "asc";
+        }
+        if (LAST_EXEC) renderTable(LAST_EXEC.rows || []);
+      });
     });
 
     // Init
     (async function init(){
       try{
+        clearError();
         await loadStores();
         await loadMeta();
-        await loadExecWeekly();
-        await loadReviews();
+        await runApply();
       }catch(e){
         console.error(e);
+        showError(String(e.message || e));
         sublineEl.innerHTML = `<span class="pill">Data Error</span><span class="pill mono">${escapeHtml(String(e.message || e))}</span>`;
       }
     })();
   </script>
 </body>
 </html>
-<!-- DEPLOY CHECK PB1 Tue Jan 13 21:54:35 EST 2026 -->
-
-<meta name="deploy-check" content="PB1 Tue Jan 13 21:58:21 EST 2026">
-
-<meta name="deploy-check" content="PB1 Tue Jan 13 21:59:04 EST 2026">
-
-<!-- DEPLOY CHECK PB1 Tue Jan 13 22:09:25 EST 2026 -->
