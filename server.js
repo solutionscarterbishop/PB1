@@ -42,7 +42,7 @@ const supabase =
 const CFG = {
   STORES_UNIQUE: "stores_unique",
   REVIEWS: "reviews",
-  EXEC_WEEKLY: "exec_weekly_v2",
+  EXEC_WEEKLY: "exec_weekly_v3",
 
   RPC_REFRESH: "refresh_exec_weekly_rollup",
   INGEST_EVENTS: "ingest_events",
