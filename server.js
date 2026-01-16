@@ -13,7 +13,8 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // CHANGE THIS STRING ANY TIME YOU WANT TO CONFIRM YOU'RE RUNNING THE NEW FILE
-const BUILD = "PB1_SERVER_BUILD__2026-01-16__INGEST_LOCK_UUID_GUARD__V1";
+const BUILD = "PB1_SERVER_BUILD__2026-01-16__EXEC_WEEKLY_V3";
+
 
 app.set("etag", false);
 app.use(cors());
