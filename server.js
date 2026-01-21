@@ -21,6 +21,8 @@ console.log("✅ SERVER START:", new Date().toISOString());
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const APIFY_TOKEN = process.env.APIFY_TOKEN || "";
+const APIFY_REVIEWS_DATASET_ID =
+  (process.env.APIFY_REVIEWS_DATASET_ID || "").trim() || "yHUzbqQzwRFMtCjAi";
 
 // required for ingest protection
 const INGEST_TOKEN = (process.env.INGEST_TOKEN || "").trim();
@@ -67,6 +69,8 @@ app.use("/api", function (_req, res, next) {
 
 // ----- Helpers -----
 const ALLOWED_SOURCES = ["apify"];
+
+let LAST_APIFY_REVIEWS_INGEST_AT = null;
 
 function norm(x) {
   return (x ?? "").toString().trim().toLowerCase();
@@ -368,6 +372,10 @@ app.get("/api/debug", async (req, res) => {
       execWeeklyRowsCount: execRows.length,
       reviewsCount: reviews.count ?? null,
       ingestEventsCount: ingestEvents.count ?? null,
+      apifyReviewsDatasetId: APIFY_REVIEWS_DATASET_ID,
+      apifyReviewsLastIngestAt: LAST_APIFY_REVIEWS_INGEST_AT,
+      apifyTokenLoaded: !!APIFY_TOKEN,
+      liveOnlyDefaults: { reviewsDefaultSource: "apify", metricsDefaultSource: "apify" },
       weeks,
       inferredColumns: {
         reviews: reviewsColumns,
@@ -383,6 +391,10 @@ app.get("/api/debug", async (req, res) => {
           stores: stores.count ?? null,
           weeklyRows: execRows.length,
           reviews: reviews.count ?? null,
+        },
+        apifyReviews: {
+          datasetId: APIFY_REVIEWS_DATASET_ID,
+          lastIngestAt: LAST_APIFY_REVIEWS_INGEST_AT,
         },
       },
     });
@@ -423,9 +435,11 @@ app.get("/api/reviews", async (req, res) => {
 
     const sourceRaw = (req.query.source ?? "").toString().trim();
     const sourceNorm = sourceRaw.toLowerCase();
-    const wantsSourceFilter = Boolean(sourceRaw) && sourceNorm !== "all";
     const reviewsColumns = await inferColumns(CFG.REVIEWS);
     const hasSourceColumn = Array.isArray(reviewsColumns) && reviewsColumns.includes("source");
+    const hasSourceFilterParam = Boolean(sourceRaw) && sourceNorm !== "all";
+    const effectiveSource = hasSourceFilterParam ? sourceRaw : (sourceNorm === "all" ? null : "apify");
+    const wantsSourceFilter = Boolean(effectiveSource) && hasSourceColumn;
     const cityFilter = (req.query.city || "").toString().trim();
     const stateFilter = (req.query.state || "").toString().trim();
 
@@ -439,7 +453,10 @@ app.get("/api/reviews", async (req, res) => {
       if (storeIdOverride) q = q.eq("store_id", storeIdOverride);
       if (cityFilter) q = q.ilike("city", `%${cityFilter}%`);
       if (stateFilter) q = q.ilike("state", `%${stateFilter}%`);
-      if (wantsSourceFilter && hasSourceColumn) q = q.eq("source", sourceRaw);
+      if (wantsSourceFilter) {
+        if (effectiveSource.toLowerCase() === "apify") q = q.ilike("source", "%apify%");
+        else q = q.eq("source", effectiveSource);
+      }
       return q.limit(limit);
     };
 
@@ -483,7 +500,7 @@ app.get("/api/reviews", async (req, res) => {
       filters: {
         limit,
         store_id: store_id ?? null,
-        source: wantsSourceFilter && hasSourceColumn ? sourceRaw : null,
+        source: effectiveSource ?? null,
         state: stateFilter || null,
         city: cityFilter || null,
         store_id_resolved_to: storeIdResolvedTo,
@@ -519,7 +536,12 @@ app.get("/api/exec-weekly", async (req, res) => {
     const stateRaw = (req.query.state ?? "").toString().trim() || null;
     const normalizedState = stateRaw ? normalizeState(stateRaw) : null;
     const cityFilter = (req.query.city ?? "").toString().trim() || null;
-    const sourceRequested = (req.query.source ?? "").toString().trim() || null;
+    const sourceRaw = (req.query.source ?? "").toString().trim();
+    const sourceNorm = sourceRaw.toLowerCase();
+    const hasSourceFilterParam = Boolean(sourceRaw) && sourceNorm !== "all";
+    const effectiveSource = hasSourceFilterParam ? sourceRaw : (sourceNorm === "all" ? null : "apify");
+    const wantsSourceFilter = Boolean(effectiveSource);
+    const sourceRequested = wantsSourceFilter ? effectiveSource : null;
 
     if (weekRaw && !isWeekString(weekRaw)) {
       return respondError(res, "EXEC_WEEKLY_V1", "invalid_week_format", 400);
@@ -590,7 +612,10 @@ app.get("/api/exec-weekly", async (req, res) => {
         let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending");
         if (store) wq = wq.eq("store_id", store);
         wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
+        if (sourceRequested && execWeeklyHasSource) {
+          if (sourceRequested.toLowerCase() === "apify") wq = wq.ilike("source", "%apify%");
+          else wq = wq.eq("source", sourceRequested);
+        }
         wq = wq.order("week_ending", { ascending: false });
         const wres = await wq.limit(1);
         if (wres.error) throw wres.error;
@@ -607,7 +632,10 @@ app.get("/api/exec-weekly", async (req, res) => {
             .order("review_date", { ascending: false });
           if (store) rq = rq.eq("store_id", store);
           else if (storeIds.length) rq = rq.in("store_id", storeIds);
-          if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
+          if (sourceRequested && hasSourceColumn) {
+            if (sourceRequested.toLowerCase() === "apify") rq = rq.ilike("source", "%apify%");
+            else rq = rq.eq("source", sourceRequested);
+          }
           const rres = await rq.limit(1);
           if (rres.error) throw rres.error;
           const latestDate = rres.data?.[0]?.review_date ?? null;
@@ -628,7 +656,10 @@ app.get("/api/exec-weekly", async (req, res) => {
           .order("week_ending", { ascending: false })
           .limit(1);
         wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
+        if (sourceRequested && execWeeklyHasSource) {
+          if (sourceRequested.toLowerCase() === "apify") wq = wq.ilike("source", "%apify%");
+          else wq = wq.eq("source", sourceRequested);
+        }
         const wres = await wq;
         if (wres.error) throw wres.error;
         resolvedWeek = wres.data?.[0]?.week_ending ?? null;
@@ -667,7 +698,10 @@ app.get("/api/exec-weekly", async (req, res) => {
         .eq("week_ending", resolvedWeek);
       if (store) q = q.eq("store_id", store);
       q = applyMarketFilters(q, { state: normalizedState, city: null });
-      if (sourceRequested && execWeeklyHasSource) q = q.ilike("source", sourceRequested);
+      if (sourceRequested && execWeeklyHasSource) {
+        if (sourceRequested.toLowerCase() === "apify") q = q.ilike("source", "%apify%");
+        else q = q.eq("source", sourceRequested);
+      }
       const execRes = await q.limit(limit);
       if (execRes.error) throw execRes.error;
       execRows = execRes.data ?? [];
@@ -711,7 +745,10 @@ app.get("/api/exec-weekly", async (req, res) => {
       rq = rq.gte("review_date", weekStart).lte("review_date", weekEnd);
     if (store) rq = rq.eq("store_id", store);
     else if (Array.isArray(storeIds) && storeIds.length) rq = rq.in("store_id", storeIds);
-    if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
+    if (sourceRequested && hasSourceColumn) {
+      if (sourceRequested.toLowerCase() === "apify") rq = rq.ilike("source", "%apify%");
+      else rq = rq.eq("source", sourceRequested);
+    }
       const reviewsRes = await rq;
       if (reviewsRes.error) throw reviewsRes.error;
       reviewsRows = reviewsRes.data ?? [];
@@ -998,8 +1035,18 @@ app.get("/api/metrics", async (req, res) => {
     const stateFilter = stateRaw || null;
     const cityFilter = cityRaw || null;
     const hasFilters = Boolean(stateFilter || cityFilter);
-    const filtersApplied = { state: stateFilter, city: cityFilter };
     const reviewsColumns = await inferColumns(CFG.REVIEWS);
+    const hasSourceColumn = Array.isArray(reviewsColumns) && reviewsColumns.includes("source");
+    const sourceRaw = (req.query.source ?? "").toString().trim();
+    const sourceNorm = sourceRaw.toLowerCase();
+    const hasSourceFilterParam = Boolean(sourceRaw) && sourceNorm !== "all";
+    const effectiveSource = hasSourceFilterParam ? sourceRaw : (sourceNorm === "all" ? null : "apify");
+    const wantsSourceFilter = Boolean(effectiveSource) && hasSourceColumn;
+    const filtersApplied = {
+      state: stateFilter,
+      city: cityFilter,
+      source: wantsSourceFilter ? effectiveSource : null,
+    };
     const execWeeklyColumns = await inferColumns(CFG.EXEC_WEEKLY);
 
     let storesCount = null;
@@ -1058,6 +1105,10 @@ app.get("/api/metrics", async (req, res) => {
     try {
       let reviewsQuery = supabase.from(CFG.REVIEWS).select("external_id", { count: "exact", head: true });
       if (storeIds.length) reviewsQuery = reviewsQuery.in("store_id", storeIds);
+      if (wantsSourceFilter) {
+        if (effectiveSource.toLowerCase() === "apify") reviewsQuery = reviewsQuery.ilike("source", "%apify%");
+        else reviewsQuery = reviewsQuery.eq("source", effectiveSource);
+      }
       const reviews = await reviewsQuery;
       if (reviews.error) throw reviews.error;
       reviewsCount = reviews.count ?? null;
@@ -1117,15 +1168,11 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
       return respondError(res, "INGEST_APIFY_REVIEWS_V1", "apify_token_not_configured", 500);
     }
 
-    const datasetId = (req.body?.datasetId || "").toString().trim();
+    const datasetId = APIFY_REVIEWS_DATASET_ID;
     const limitRaw = req.body?.limit;
     const limitNum = Number(limitRaw ?? 2000);
     const limit = Number.isFinite(limitNum) && limitNum > 0 ? Math.min(Math.floor(limitNum), 2000) : 2000;
-    const source = (req.body?.source || "apify").toString().trim() || "apify";
-
-    if (!datasetId) {
-      return respondError(res, "INGEST_APIFY_REVIEWS_V1", "missing_dataset_id", 400);
-    }
+    const source = "apify_google_maps";
 
     const url =
       `https://api.apify.com/v2/datasets/${encodeURIComponent(datasetId)}/items` +
@@ -1178,36 +1225,9 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
       });
     }
 
-    const storeColumns = await inferColumns(CFG.STORES);
-    const hasPlaceId = Array.isArray(storeColumns) && storeColumns.includes("place_id");
-    const storeSelect = hasPlaceId
-      ? "id,store_id,address,city,state,name,place_id"
-      : "id,store_id,address,city,state,name";
-    const storesRes = await supabase.from(CFG.STORES).select(storeSelect);
-    if (storesRes.error) throw storesRes.error;
-    const stores = storesRes.data ?? [];
-
-    const byStoreId = new Map();
-    const byPlaceId = new Map();
-    const byAddress = new Map();
-    const storeIdSet = new Set();
-    for (const s of stores) {
-      if (s.id) storeIdSet.add(s.id);
-      if (s.store_id) byStoreId.set(String(s.store_id).toLowerCase(), s);
-      if (s.id) byStoreId.set(String(s.id).toLowerCase(), s);
-      if (hasPlaceId && s.place_id) {
-        byPlaceId.set(String(s.place_id).toLowerCase(), s);
-      }
-      if (s.address) {
-        const key = normalizeAddress(s.address);
-        if (key) byAddress.set(key, s);
-      }
-    }
-
     const reviewRows = [];
     const sampleMapped = [];
-    const sampleUnmatched = [];
-    let matched = 0;
+    let skipped = 0;
 
     const extractReviewDate = (v) => {
       const str = String(v || "");
@@ -1219,54 +1239,13 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
     };
 
     for (const item of rowsRaw) {
-      const address =
-        item?.address ||
-        item?.location?.address ||
-        item?.place?.address ||
+      const placeId =
+        item?.place_id ||
+        item?.placeId ||
+        item?.location?.place_id ||
+        item?.location?.placeId ||
+        item?.place?.placeId ||
         null;
-
-      let storeMatch = null;
-      const rawStoreId =
-        item?.store_id ||
-        item?.storeId ||
-        item?.location?.store_id ||
-        item?.location?.storeId ||
-        null;
-      if (rawStoreId && byStoreId.has(String(rawStoreId).toLowerCase())) {
-        storeMatch = byStoreId.get(String(rawStoreId).toLowerCase());
-      } else if (hasPlaceId && item?.placeId && byPlaceId.has(String(item.placeId).toLowerCase())) {
-        storeMatch = byPlaceId.get(String(item.placeId).toLowerCase());
-      } else if (address) {
-        const key = normalizeAddress(address);
-        if (key && byAddress.has(key)) storeMatch = byAddress.get(key);
-      }
-
-      // PB1_FIX_STORE_ID_V1
-      if (!storeMatch) {
-        if (sampleUnmatched.length < 5) {
-          sampleUnmatched.push({
-            address: address || null,
-            reviewer_name: item?.reviewer_name || item?.reviewerName || item?.author || item?.userName || null,
-          });
-        }
-        continue;
-      }
-
-      const storeMatchId = storeMatch?.id || null;
-      if (!storeMatchId || !storeIdSet.has(storeMatchId)) {
-        return res.status(500).json({
-          ok: false,
-          signature: "INGEST_APIFY_REVIEWS_V1",
-          error: "invalid_store_match_id",
-          datasetId,
-          sample: {
-            placeId: item?.placeId || null,
-            address: address || null,
-          },
-        });
-      }
-
-      matched += 1;
       const reviewerName =
         item?.name ||
         item?.reviewerName ||
@@ -1296,7 +1275,11 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
       const placeName =
         item?.title || item?.place_name || item?.placeName || item?.locationName || null;
 
+      const storeId = placeId
+        ? String(placeId)
+        : sha1([placeName || "", reviewUrl || ""].join("|"));
       const externalId =
+        reviewUrl ||
         item?.reviewId ||
         item?.external_id ||
         item?.id ||
@@ -1306,42 +1289,40 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
             Number.isFinite(rating) ? String(rating) : "",
             reviewText || "",
             reviewDate || "",
-            address || storeMatch.address || "",
-            storeMatchId || "",
+            storeId || "",
           ].join("|")
         );
 
       const row = {
-        store_id: storeMatchId,
+        store_id: storeId,
         source,
         reviewer_name: reviewerName,
         rating: Number.isFinite(rating) ? rating : null,
         review_text: reviewText,
         review_date: reviewDate,
         url: reviewUrl,
-        external_id: externalId,
-        city: item?.city || item?.location?.city || storeMatch.city || null,
-        state: item?.state || item?.location?.state || storeMatch.state || null,
-        place_name: placeName || storeMatch.name || null,
-        address: address || storeMatch.address || null,
+        external_id: reviewUrl ? sha1(String(reviewUrl)) : String(externalId),
+        city: item?.city || item?.location?.city || null,
+        state: item?.state || item?.location?.state || null,
       };
       reviewRows.push(row);
       if (sampleMapped.length < 3) {
         sampleMapped.push({
-          store_id: storeMatchId,
-          placeId: item?.placeId || null,
-          city: storeMatch.city || null,
-          state: storeMatch.state || null,
+          store_id: storeId,
+          placeId: placeId || null,
+          city: row.city,
+          state: row.state,
           reviewer_name: reviewerName,
           rating: Number.isFinite(rating) ? rating : null,
           review_date: reviewDate,
           url: reviewUrl,
-          external_id: externalId,
+          external_id: row.external_id,
           review_text_preview: (reviewText || "").slice(0, 80),
         });
       }
     }
 
+    skipped = Math.max(rowsRaw.length - reviewRows.length, 0);
     const storeIdSample = [...new Set(reviewRows.map((r) => r.store_id).filter(Boolean))].slice(0, 3);
 
     if (!reviewRows.length) {
@@ -1350,10 +1331,12 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
         signature: "INGEST_APIFY_REVIEWS_V1",
         datasetId,
         fetched: rowsRaw.length,
-        matched,
+        matched: reviewRows.length,
         ingested: 0,
-        unmatched: rowsRaw.length - matched,
-        sample_unmatched: sampleUnmatched,
+        inserted: 0,
+        updated: 0,
+        skipped: rowsRaw.length,
+        errors: 0,
         store_id_sample: [],
         last_updated: nowIso(),
       });
@@ -1361,8 +1344,17 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
 
     console.log("INGEST_MAP_V2 sample:", sampleMapped[0]);
 
+    const externalIds = [...new Set(reviewRows.map((r) => r.external_id).filter(Boolean))];
+    let existingCount = 0;
+    if (externalIds.length) {
+      const existingRes = await supabase.from(CFG.REVIEWS).select("external_id").in("external_id", externalIds);
+      if (existingRes.error) throw existingRes.error;
+      existingCount = (existingRes.data || []).length;
+    }
+
     const upsertRes = await supabase.from(CFG.REVIEWS).upsert(reviewRows, { onConflict: "external_id" });
     if (upsertRes.error) throw upsertRes.error;
+    LAST_APIFY_REVIEWS_INGEST_AT = nowIso();
 
     return res.json({
       ok: true,
@@ -1372,10 +1364,12 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
       sample_mapped: sampleMapped,
       datasetId,
       fetched: rowsRaw.length,
-      matched,
+      matched: reviewRows.length,
       ingested: reviewRows.length,
-      unmatched: rowsRaw.length - matched,
-      sample_unmatched: sampleUnmatched,
+      inserted: Math.max(reviewRows.length - existingCount, 0),
+      updated: existingCount,
+      skipped,
+      errors: 0,
       store_id_sample: storeIdSample,
       last_updated: nowIso(),
     });
@@ -1651,3 +1645,9 @@ app.get("/api/stores-apify", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`pb1 backend running on http://localhost:${PORT}`);
 });
+
+// VERIFY (local):
+// curl -s "http://localhost:10000/api/reviews?limit=3" | python3 -m json.tool
+// curl -s "http://localhost:10000/api/metrics?state=Illinois&city=Chicago" | python3 -m json.tool | head -n 60
+// curl -s "http://localhost:10000/api/reviews?limit=3&source=seed" | python3 -m json.tool
+// curl -s "http://localhost:10000/api/debug" | python3 -m json.tool | head -n 80
