@@ -116,10 +116,8 @@ function normalizeState(input) {
     TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
   };
   if (up.length === 2 && map[up]) return { raw: s, code: up, name: map[up] };
-  const codeFromName = Object.keys(map).find((code) => map[code].toUpperCase() === up);
-  if (codeFromName) return { raw: s, code: codeFromName, name: map[codeFromName] };
-  // if user typed full name already or something else
-  return { raw: s, code: null, name: s };
+  // if user typed full name already
+  return { raw: s, code: map[up] ? up : null, name: s };
 }
 function parseMarketFilters(req) {
   const stateRaw = (req.query.state || "").toString().trim();
@@ -514,14 +512,14 @@ app.get("/api/exec-weekly", async (req, res) => {
   try {
     if (!requireSupabase(res, "EXEC_WEEKLY_V1")) return;
 
-    const weekRaw = (req.query.week ?? "").toString().trim() || null;
+    const weekRaw = (req.query.week ?? "").toString().trim();
+    const week = weekRaw || null;
     const store = (req.query.store || req.query.store_id || "").toString().trim() || null;
-    const stateRaw = (req.query.state ?? "").toString().trim() || null;
-    const normalizedState = stateRaw ? normalizeState(stateRaw) : null;
-    const cityFilter = (req.query.city ?? "").toString().trim() || null;
     const sourceRequested = (req.query.source ?? "").toString().trim() || null;
+    const stateFilter = (req.query.state ?? "").toString().trim() || null;
+    const cityFilter = (req.query.city ?? "").toString().trim() || null;
 
-    if (weekRaw && !isWeekString(weekRaw)) {
+    if (week && !isWeekString(week)) {
       return respondError(res, "EXEC_WEEKLY_V1", "invalid_week_format", 400);
     }
     if (store && !isUuid(store)) {
@@ -537,30 +535,24 @@ app.get("/api/exec-weekly", async (req, res) => {
     }
     const limit = parseLimit(req.query.limit ?? 5000, 5000, 5000);
 
+    let reviewsColumns = null;
     let hasSourceColumn = false;
     try {
-      const reviewsColumns = await inferColumns(CFG.REVIEWS);
+      reviewsColumns = await inferColumns(CFG.REVIEWS);
       hasSourceColumn = Array.isArray(reviewsColumns) && reviewsColumns.includes("source");
     } catch (e) {
       return respondExecWeeklyError("execWeekly:reviewsColumns", e);
-    }
-    let execWeeklyHasSource = false;
-    try {
-      const execWeeklyColumns = await inferColumns(CFG.EXEC_WEEKLY);
-      execWeeklyHasSource =
-        Array.isArray(execWeeklyColumns) && execWeeklyColumns.includes("source");
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:execWeeklyColumns", e);
     }
 
     let storeIds = null;
     const storeMap = new Map();
     if (store) {
       storeIds = [store];
-    } else if (normalizedState) {
+    } else if (stateFilter || cityFilter) {
       try {
         let sq = supabase.from(CFG.STORES).select("id,name,city,state");
-        sq = applyMarketFilters(sq, { state: normalizedState, city: null });
+        if (stateFilter) sq = sq.ilike("state", `%${stateFilter}%`);
+        if (cityFilter) sq = sq.ilike("city", `%${cityFilter}%`);
         const sres = await sq;
         if (sres.error) throw sres.error;
         const rows = sres.data ?? [];
@@ -573,86 +565,56 @@ app.get("/api/exec-weekly", async (req, res) => {
       }
     }
 
-    const computeWeekEnding = (dateStr) => {
+    const resolveWeekEnding = (dateStr) => {
       const d = new Date(`${dateStr}T00:00:00Z`);
       if (Number.isNaN(d.getTime())) return null;
-      const day = d.getUTCDay(); // 0=Sun,1=Mon
-      const offset = (1 - day + 7) % 7;
+      const day = d.getUTCDay();
+      const offset = day === 0 ? 0 : 7 - day;
       d.setUTCDate(d.getUTCDate() + offset);
       return d.toISOString().slice(0, 10);
     };
 
-    let resolvedWeek = weekRaw;
-    if (!resolvedWeek && Array.isArray(storeIds)) {
-      let execWeekLatest = null;
-      let reviewWeekLatest = null;
+    let resolvedWeek = week;
+    let weeks = [];
+    if (!resolvedWeek) {
       try {
-        let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending");
-        if (store) wq = wq.eq("store_id", store);
-        wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
-        wq = wq.order("week_ending", { ascending: false });
-        const wres = await wq.limit(1);
-        if (wres.error) throw wres.error;
-        execWeekLatest = wres.data?.[0]?.week_ending ?? null;
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekExec", e);
-      }
-      try {
-        if (store || (Array.isArray(storeIds) && storeIds.length)) {
-          let rq = supabase
-            .from(CFG.REVIEWS)
-            .select("review_date")
-            .not("review_date", "is", null)
-            .order("review_date", { ascending: false });
-          if (store) rq = rq.eq("store_id", store);
-          else if (storeIds.length) rq = rq.in("store_id", storeIds);
-          if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
-          const rres = await rq.limit(1);
-          if (rres.error) throw rres.error;
-          const latestDate = rres.data?.[0]?.review_date ?? null;
-          reviewWeekLatest = latestDate ? computeWeekEnding(latestDate) : null;
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekReviews", e);
-      }
-      if (execWeekLatest) resolvedWeek = execWeekLatest;
-      else resolvedWeek = reviewWeekLatest || null;
-    }
-
-    if (!resolvedWeek && storeIds === null) {
-      try {
-        let wq = supabase
+        const weeksRes = await supabase
           .from(CFG.EXEC_WEEKLY)
           .select("week_ending")
           .order("week_ending", { ascending: false })
-          .limit(1);
-        wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
-        const wres = await wq;
-        if (wres.error) throw wres.error;
-        resolvedWeek = wres.data?.[0]?.week_ending ?? null;
+          .limit(5000);
+        if (weeksRes.error) throw weeksRes.error;
+        weeks = [...new Set((weeksRes.data ?? []).map((r) => r.week_ending).filter(Boolean))];
+        resolvedWeek = weeks[0] || null;
       } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekGlobal", e);
+        return respondExecWeeklyError("execWeekly:resolveWeek", e);
+      }
+    }
+    if (!resolvedWeek) {
+      try {
+        let rq = supabase
+          .from(CFG.REVIEWS)
+          .select("review_date")
+          .not("review_date", "is", null)
+          .order("review_date", { ascending: false })
+          .limit(1);
+        if (storeIds && storeIds.length) rq = rq.in("store_id", storeIds);
+        if (store) rq = rq.eq("store_id", store);
+        if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
+        const rres = await rq;
+        if (rres.error) throw rres.error;
+        const latestDate = rres.data?.[0]?.review_date ?? null;
+        resolvedWeek = latestDate ? resolveWeekEnding(latestDate) : null;
+      } catch (e) {
+        return respondExecWeeklyError("execWeekly:resolveWeek", e);
       }
     }
 
-    const logExecWeekly = ({ usedFallback, records, week }) => {
-      console.info("exec-weekly", {
-        week: week ?? null,
-        state: stateRaw ?? null,
-        store: store ?? null,
-        usedFallback,
-        records,
-      });
-    };
-
-    if (!resolvedWeek) {
-      logExecWeekly({ usedFallback: false, records: 0, week: null });
+    if ((stateFilter || cityFilter) && storeIds && storeIds.length === 0) {
       return sendExecWeekly(res, [], {
-        week: null,
+        week: resolvedWeek ?? null,
         store,
-        state: stateRaw,
+        state: stateFilter,
         city: cityFilter,
         sourceRequested,
         fallbackUsed: false,
@@ -660,58 +622,57 @@ app.get("/api/exec-weekly", async (req, res) => {
     }
 
     let execRows = [];
-    try {
-      let q = supabase
-        .from(CFG.EXEC_WEEKLY)
-        .select("week_ending,store_id,store_name,state,avg_rating,total_reviews,low_reviews,high_reviews")
-        .eq("week_ending", resolvedWeek);
-      if (store) q = q.eq("store_id", store);
-      q = applyMarketFilters(q, { state: normalizedState, city: null });
-      if (sourceRequested && execWeeklyHasSource) q = q.ilike("source", sourceRequested);
-      const execRes = await q.limit(limit);
-      if (execRes.error) throw execRes.error;
-      execRows = execRes.data ?? [];
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:execWeeklyQuery", e);
+    if (resolvedWeek) {
+      try {
+        let q = supabase
+          .from(CFG.EXEC_WEEKLY)
+          .select("week_ending,store_id,store_name,state,avg_rating,total_reviews,low_reviews,high_reviews")
+          .eq("week_ending", resolvedWeek);
+        if (store) q = q.eq("store_id", store);
+        else if (storeIds && storeIds.length) q = q.in("store_id", storeIds);
+        const execRes = await q.limit(limit);
+        if (execRes.error) throw execRes.error;
+        execRows = execRes.data ?? [];
+      } catch (e) {
+        return respondExecWeeklyError("execWeekly:execWeeklyQuery", e);
+      }
     }
 
     if (execRows.length) {
-      logExecWeekly({ usedFallback: false, records: execRows.length, week: resolvedWeek });
       return sendExecWeekly(res, execRows, {
-        week: resolvedWeek,
+        week: resolvedWeek ?? null,
         store,
-        state: stateRaw,
+        state: stateFilter,
         city: cityFilter,
         sourceRequested,
         fallbackUsed: false,
       });
     }
 
-    if (normalizedState && Array.isArray(storeIds) && storeIds.length === 0) {
-      logExecWeekly({ usedFallback: false, records: 0, week: resolvedWeek });
+    if (!resolvedWeek) {
       return sendExecWeekly(res, [], {
-        week: resolvedWeek,
+        week: null,
         store,
-        state: stateRaw,
+        state: stateFilter,
         city: cityFilter,
         sourceRequested,
-        fallbackUsed: false,
+        fallbackUsed: true,
       });
     }
 
-    const endDate = new Date(`${resolvedWeek}T00:00:00Z`);
+    const weekEnd = resolvedWeek;
+    const endDate = new Date(`${weekEnd}T00:00:00Z`);
     const startDate = new Date(endDate.getTime());
     startDate.setUTCDate(startDate.getUTCDate() - 6);
     const weekStart = startDate.toISOString().slice(0, 10);
-    const weekEnd = resolvedWeek;
 
     let reviewsRows = [];
     try {
       let rq = supabase.from(CFG.REVIEWS).select("store_id,rating,review_date");
       rq = rq.gte("review_date", weekStart).lte("review_date", weekEnd);
-    if (store) rq = rq.eq("store_id", store);
-    else if (Array.isArray(storeIds) && storeIds.length) rq = rq.in("store_id", storeIds);
-    if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
+      if (store) rq = rq.eq("store_id", store);
+      else if (storeIds && storeIds.length) rq = rq.in("store_id", storeIds);
+      if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
       const reviewsRes = await rq;
       if (reviewsRes.error) throw reviewsRes.error;
       reviewsRows = reviewsRes.data ?? [];
@@ -781,11 +742,10 @@ app.get("/api/exec-weekly", async (req, res) => {
       return b.avg_rating - a.avg_rating;
     });
 
-    logExecWeekly({ usedFallback: true, records: fallbackRows.length, week: resolvedWeek });
     return sendExecWeekly(res, fallbackRows, {
       week: resolvedWeek,
       store,
-      state: stateRaw,
+      state: stateFilter,
       city: cityFilter,
       sourceRequested,
       fallbackUsed: true,

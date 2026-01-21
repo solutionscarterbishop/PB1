@@ -116,10 +116,8 @@ function normalizeState(input) {
     TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
   };
   if (up.length === 2 && map[up]) return { raw: s, code: up, name: map[up] };
-  const codeFromName = Object.keys(map).find((code) => map[code].toUpperCase() === up);
-  if (codeFromName) return { raw: s, code: codeFromName, name: map[codeFromName] };
-  // if user typed full name already or something else
-  return { raw: s, code: null, name: s };
+  // if user typed full name already
+  return { raw: s, code: map[up] ? up : null, name: s };
 }
 function parseMarketFilters(req) {
   const stateRaw = (req.query.state || "").toString().trim();
@@ -296,7 +294,6 @@ function sendExecWeekly(res, rowsRaw, filters) {
         city: filters.city ?? null,
         sourceRequested: filters.sourceRequested ?? null,
       },
-      fallbackUsed: Boolean(filters.fallbackUsed),
       counts: {
         weeklyRows: rows.length,
       },
@@ -498,30 +495,19 @@ app.get("/api/reviews", async (req, res) => {
 
 // ---------- /api/exec-weekly ----------
 app.get("/api/exec-weekly", async (req, res) => {
-  const errorDetail = (err) => ({
-    message: err?.message ?? null,
-    code: err?.code ?? null,
-    hint: err?.hint ?? null,
-  });
-  const respondExecWeeklyError = (where, err) => {
-    console.error("❌ /api/exec-weekly error:", where, err);
-    respondError(res, "EXEC_WEEKLY_V1", "server_error", 500, {
-      where,
-      error_detail: errorDetail(err),
-    });
-  };
-
   try {
     if (!requireSupabase(res, "EXEC_WEEKLY_V1")) return;
 
-    const weekRaw = (req.query.week ?? "").toString().trim() || null;
+    const week = norm(req.query.week) || null;
     const store = (req.query.store || req.query.store_id || "").toString().trim() || null;
-    const stateRaw = (req.query.state ?? "").toString().trim() || null;
-    const normalizedState = stateRaw ? normalizeState(stateRaw) : null;
-    const cityFilter = (req.query.city ?? "").toString().trim() || null;
     const sourceRequested = (req.query.source ?? "").toString().trim() || null;
+    const filters = parseMarketFilters(req);
+    const state = filters.state?.name || null;
+    const code = filters.state?.code || null;
+    const stateRaw = filters.state?.raw ?? null;
+    const city = filters.city;
 
-    if (weekRaw && !isWeekString(weekRaw)) {
+    if (week && !isWeekString(week)) {
       return respondError(res, "EXEC_WEEKLY_V1", "invalid_week_format", 400);
     }
     if (store && !isUuid(store)) {
@@ -537,261 +523,248 @@ app.get("/api/exec-weekly", async (req, res) => {
     }
     const limit = parseLimit(req.query.limit ?? 5000, 5000, 5000);
 
-    let hasSourceColumn = false;
-    try {
-      const reviewsColumns = await inferColumns(CFG.REVIEWS);
-      hasSourceColumn = Array.isArray(reviewsColumns) && reviewsColumns.includes("source");
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:reviewsColumns", e);
-    }
-    let execWeeklyHasSource = false;
-    try {
-      const execWeeklyColumns = await inferColumns(CFG.EXEC_WEEKLY);
-      execWeeklyHasSource =
-        Array.isArray(execWeeklyColumns) && execWeeklyColumns.includes("source");
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:execWeeklyColumns", e);
-    }
+    const MIN_STORES = Number(process.env.MIN_STORES_FOR_LATEST_WEEK || 2);
 
     let storeIds = null;
-    const storeMap = new Map();
-    if (store) {
-      storeIds = [store];
-    } else if (normalizedState) {
-      try {
-        let sq = supabase.from(CFG.STORES).select("id,name,city,state");
-        sq = applyMarketFilters(sq, { state: normalizedState, city: null });
-        const sres = await sq;
-        if (sres.error) throw sres.error;
-        const rows = sres.data ?? [];
-        storeIds = rows.map((r) => r.id).filter(Boolean);
-        for (const s of rows) {
-          if (s.id) storeMap.set(s.id, s);
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:stores", e);
-      }
-    }
-
-    const computeWeekEnding = (dateStr) => {
-      const d = new Date(`${dateStr}T00:00:00Z`);
-      if (Number.isNaN(d.getTime())) return null;
-      const day = d.getUTCDay(); // 0=Sun,1=Mon
-      const offset = (1 - day + 7) % 7;
-      d.setUTCDate(d.getUTCDate() + offset);
-      return d.toISOString().slice(0, 10);
-    };
-
-    let resolvedWeek = weekRaw;
-    if (!resolvedWeek && Array.isArray(storeIds)) {
-      let execWeekLatest = null;
-      let reviewWeekLatest = null;
-      try {
-        let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending");
-        if (store) wq = wq.eq("store_id", store);
-        wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
-        wq = wq.order("week_ending", { ascending: false });
-        const wres = await wq.limit(1);
-        if (wres.error) throw wres.error;
-        execWeekLatest = wres.data?.[0]?.week_ending ?? null;
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekExec", e);
-      }
-      try {
-        if (store || (Array.isArray(storeIds) && storeIds.length)) {
-          let rq = supabase
-            .from(CFG.REVIEWS)
-            .select("review_date")
-            .not("review_date", "is", null)
-            .order("review_date", { ascending: false });
-          if (store) rq = rq.eq("store_id", store);
-          else if (storeIds.length) rq = rq.in("store_id", storeIds);
-          if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
-          const rres = await rq.limit(1);
-          if (rres.error) throw rres.error;
-          const latestDate = rres.data?.[0]?.review_date ?? null;
-          reviewWeekLatest = latestDate ? computeWeekEnding(latestDate) : null;
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekReviews", e);
-      }
-      if (execWeekLatest) resolvedWeek = execWeekLatest;
-      else resolvedWeek = reviewWeekLatest || null;
-    }
-
-    if (!resolvedWeek && storeIds === null) {
-      try {
-        let wq = supabase
-          .from(CFG.EXEC_WEEKLY)
-          .select("week_ending")
-          .order("week_ending", { ascending: false })
-          .limit(1);
-        wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) wq = wq.ilike("source", sourceRequested);
-        const wres = await wq;
-        if (wres.error) throw wres.error;
-        resolvedWeek = wres.data?.[0]?.week_ending ?? null;
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekGlobal", e);
-      }
-    }
-
-    const logExecWeekly = ({ usedFallback, records, week }) => {
-      console.info("exec-weekly", {
-        week: week ?? null,
-        state: stateRaw ?? null,
-        store: store ?? null,
-        usedFallback,
-        records,
-      });
-    };
-
-    if (!resolvedWeek) {
-      logExecWeekly({ usedFallback: false, records: 0, week: null });
-      return sendExecWeekly(res, [], {
-        week: null,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
-    }
-
-    let execRows = [];
-    try {
-      let q = supabase
-        .from(CFG.EXEC_WEEKLY)
-        .select("week_ending,store_id,store_name,state,avg_rating,total_reviews,low_reviews,high_reviews")
-        .eq("week_ending", resolvedWeek);
-      if (store) q = q.eq("store_id", store);
-      q = applyMarketFilters(q, { state: normalizedState, city: null });
-      if (sourceRequested && execWeeklyHasSource) q = q.ilike("source", sourceRequested);
-      const execRes = await q.limit(limit);
-      if (execRes.error) throw execRes.error;
-      execRows = execRes.data ?? [];
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:execWeeklyQuery", e);
-    }
-
-    if (execRows.length) {
-      logExecWeekly({ usedFallback: false, records: execRows.length, week: resolvedWeek });
-      return sendExecWeekly(res, execRows, {
-        week: resolvedWeek,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
-    }
-
-    if (normalizedState && Array.isArray(storeIds) && storeIds.length === 0) {
-      logExecWeekly({ usedFallback: false, records: 0, week: resolvedWeek });
-      return sendExecWeekly(res, [], {
-        week: resolvedWeek,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
-    }
-
-    const endDate = new Date(`${resolvedWeek}T00:00:00Z`);
-    const startDate = new Date(endDate.getTime());
-    startDate.setUTCDate(startDate.getUTCDate() - 6);
-    const weekStart = startDate.toISOString().slice(0, 10);
-    const weekEnd = resolvedWeek;
-
-    let reviewsRows = [];
-    try {
-      let rq = supabase.from(CFG.REVIEWS).select("store_id,rating,review_date");
-      rq = rq.gte("review_date", weekStart).lte("review_date", weekEnd);
-    if (store) rq = rq.eq("store_id", store);
-    else if (Array.isArray(storeIds) && storeIds.length) rq = rq.in("store_id", storeIds);
-    if (sourceRequested && hasSourceColumn) rq = rq.eq("source", sourceRequested);
-      const reviewsRes = await rq;
-      if (reviewsRes.error) throw reviewsRes.error;
-      reviewsRows = reviewsRes.data ?? [];
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:fallbackReviews", e);
-    }
-
-    if (!storeMap.size && reviewsRows.length) {
-      try {
-        const reviewStoreIds = [
-          ...new Set(reviewsRows.map((r) => r.store_id).filter(Boolean)),
-        ];
-        if (reviewStoreIds.length) {
-          const sres = await supabase
-            .from(CFG.STORES)
-            .select("id,name,city,state")
-            .in("id", reviewStoreIds);
-          if (sres.error) throw sres.error;
-          for (const s of sres.data || []) {
-            if (s.id) storeMap.set(s.id, s);
-          }
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:fallbackStores", e);
-      }
-    }
-
-    const rollups = new Map();
-    for (const r of reviewsRows) {
-      if (!r.store_id) continue;
-      if (!rollups.has(r.store_id)) {
-        const storeInfo = storeMap.get(r.store_id) || {};
-        rollups.set(r.store_id, {
-          week_ending: resolvedWeek,
-          store_id: r.store_id,
-          store_name: storeInfo.name || null,
-          state: storeInfo.state || null,
-          avg_rating: 0,
-          total_reviews: 0,
-          low_reviews: 0,
-          high_reviews: 0,
-          _rating_sum: 0,
-          _rating_count: 0,
+    const useMarketStoreIds = Boolean(city) && !store;
+    if (useMarketStoreIds) {
+      let sq = supabase.from(CFG.STORES).select("id");
+      sq = applyMarketFilters(sq, filters);
+      const sres = await sq;
+      if (sres.error) throw sres.error;
+      storeIds = (sres.data || []).map((r) => r.id).filter(Boolean);
+      if (!storeIds.length) {
+        return sendExecWeekly(res, [], {
+          week: week ?? null,
+          store,
+          state: stateRaw,
+          city,
+          sourceRequested,
         });
       }
-      const rec = rollups.get(r.store_id);
-      rec.total_reviews += 1;
-      const ratingNum = Number(r.rating);
-      if (Number.isFinite(ratingNum)) {
-        rec._rating_sum += ratingNum;
-        rec._rating_count += 1;
-        if (ratingNum <= 2) rec.low_reviews += 1;
-        if (ratingNum >= 4) rec.high_reviews += 1;
+    }
+
+    const getMarketStoreIdsForReviews = async () => {
+      if (store) return null;
+      if (!filters.state && !filters.city) return null;
+      let sq = supabase.from(CFG.STORES).select("id");
+      sq = applyMarketFilters(sq, filters);
+      const sres = await sq;
+      if (sres.error) throw sres.error;
+      return (sres.data || []).map((r) => r.id).filter(Boolean);
+    };
+
+    const buildWeeklyFromReviews = async (targetWeek) => {
+      const marketStoreIds = store ? null : storeIds || (await getMarketStoreIdsForReviews());
+      let rq = supabase.from(CFG.REVIEWS).select("store_id,rating,review_date,created_at");
+      if (store) {
+        rq = rq.eq("store_id", store);
+      } else if (marketStoreIds && marketStoreIds.length) {
+        rq = rq.in("store_id", marketStoreIds);
+      }
+      const reviewsRes = await rq.limit(10000);
+      if (reviewsRes.error) throw reviewsRes.error;
+      const reviewsRows = reviewsRes.data ?? [];
+
+      const storeIdSet = new Set(reviewsRows.map((r) => r.store_id).filter(Boolean));
+      const storeMap = new Map();
+      if (storeIdSet.size) {
+        const storeIdList = Array.from(storeIdSet);
+        const storesRes = await supabase
+          .from(CFG.STORES)
+          .select("id,name,state,city")
+          .in("id", storeIdList);
+        if (storesRes.error) throw storesRes.error;
+        for (const s of storesRes.data || []) {
+          storeMap.set(s.id, s);
+        }
+      }
+
+      const rollups = new Map();
+      const toWeekEnding = (dateStr) => {
+        const d = new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return null;
+        const day = d.getUTCDay();
+        const offset = day === 0 ? 0 : 7 - day;
+        d.setUTCDate(d.getUTCDate() + offset);
+        return d.toISOString().slice(0, 10);
+      };
+
+      for (const r of reviewsRows) {
+        const dateStr = r.review_date || r.created_at || null;
+        if (!dateStr) continue;
+        const weekEnding = toWeekEnding(dateStr);
+        if (!weekEnding) continue;
+        if (targetWeek && weekEnding !== targetWeek) continue;
+
+        const key = `${r.store_id}|${weekEnding}`;
+        if (!rollups.has(key)) {
+          const storeInfo = storeMap.get(r.store_id) || {};
+          rollups.set(key, {
+            store_id: r.store_id,
+            week_ending: weekEnding,
+            avg_rating: 0,
+            total_reviews: 0,
+            low_reviews: 0,
+            high_reviews: 0,
+            store_name: storeInfo.name || null,
+            state: storeInfo.state || null,
+            city: storeInfo.city || null,
+            _rating_sum: 0,
+            _rating_count: 0,
+          });
+        }
+
+        const rec = rollups.get(key);
+        rec.total_reviews += 1;
+        const ratingNum = Number(r.rating);
+        if (Number.isFinite(ratingNum)) {
+          rec._rating_sum += ratingNum;
+          rec._rating_count += 1;
+          if (ratingNum <= 2) rec.low_reviews += 1;
+          if (ratingNum >= 4) rec.high_reviews += 1;
+        }
+      }
+
+      const rows = [];
+      for (const rec of rollups.values()) {
+        rec.avg_rating =
+          rec._rating_count > 0 ? Number((rec._rating_sum / rec._rating_count).toFixed(2)) : 0;
+        delete rec._rating_sum;
+        delete rec._rating_count;
+        rows.push(rec);
+      }
+      return rows;
+    };
+
+    const applyExecWeeklyFilters = (q) => {
+      let out = q;
+      if (store) {
+        out = out.eq("store_id", store);
+      } else if (storeIds && storeIds.length) {
+        out = out.in("store_id", storeIds);
+      }
+      if (!useMarketStoreIds && (state || code)) {
+        out = applyMarketFilters(out, { state: { name: state, code }, city: null });
+      }
+      return out;
+    };
+
+    const buildWeekQuery = (w) => {
+      let q = supabase.from(CFG.EXEC_WEEKLY).select("*").eq("week_ending", w);
+      q = applyExecWeeklyFilters(q);
+      return q.order("week_ending", { ascending: false });
+    };
+
+    // If user explicitly asked for a week, fetch it (no fallback)
+    if (week) {
+      const { data, error } = await buildWeekQuery(week).limit(limit);
+      if (error) throw error;
+      const rows = data ?? [];
+      if (!rows.length) {
+        const fallbackRows = await buildWeeklyFromReviews(week);
+        if (fallbackRows.length) {
+          return sendExecWeekly(res, fallbackRows, {
+            week,
+            store,
+            state: stateRaw,
+            city,
+            sourceRequested,
+          });
+        }
+      }
+      return sendExecWeekly(res, rows, {
+        week,
+        store,
+        state: stateRaw,
+        city,
+        sourceRequested,
+      });
+    }
+
+    // No week -> find candidate weeks newest->oldest
+    let weeks = [];
+    let attemptWeeks = supabase
+      .from(CFG.EXEC_WEEKLY)
+      .select("week_ending")
+      .order("week_ending", { ascending: false })
+      .limit(5000);
+    const attemptWeeksResult = await attemptWeeks;
+
+    if (attemptWeeksResult.error) {
+      throw attemptWeeksResult.error;
+    } else {
+      weeks = [...new Set((attemptWeeksResult.data ?? []).map((r) => r.week_ending).filter(Boolean))];
+    }
+
+    if (!weeks.length) {
+      const fallbackRows = await buildWeeklyFromReviews(null);
+      if (fallbackRows.length) {
+        const latestWeek = fallbackRows
+          .map((r) => r.week_ending)
+          .filter(Boolean)
+          .sort()
+          .slice(-1)[0];
+        const finalRows = latestWeek
+          ? fallbackRows.filter((r) => r.week_ending === latestWeek)
+          : fallbackRows;
+        return sendExecWeekly(res, finalRows, {
+          week: latestWeek ?? null,
+          store,
+          state: stateRaw,
+          city,
+          sourceRequested,
+        });
+      }
+      return sendExecWeekly(res, [], { week: null, store, state: stateRaw, city, sourceRequested });
+    }
+
+    // Choose effective week: first week with >= MIN_STORES rows (after filters)
+    let effectiveWeek = null;
+    for (const w of weeks) {
+      const { data, error } = await buildWeekQuery(w).limit(limit);
+      if (error) throw error;
+      const rows = data ?? [];
+      if (rows.length >= MIN_STORES) {
+        effectiveWeek = w;
+        break;
+      }
+    }
+    if (!effectiveWeek) effectiveWeek = weeks[0] || null;
+
+    if (!effectiveWeek) {
+      return sendExecWeekly(res, [], { week: null, store, state: stateRaw, city, sourceRequested });
+    }
+
+    const { data: finalRows, error: finalErr } = await buildWeekQuery(effectiveWeek).limit(limit);
+    if (finalErr) throw finalErr;
+
+    const rows = finalRows ?? [];
+    if (!rows.length) {
+      const fallbackRows = await buildWeeklyFromReviews(effectiveWeek);
+      if (fallbackRows.length) {
+        return sendExecWeekly(res, fallbackRows, {
+          week: effectiveWeek,
+          store,
+          state: stateRaw,
+          city,
+          sourceRequested,
+        });
       }
     }
 
-    const fallbackRows = [];
-    for (const rec of rollups.values()) {
-      rec.avg_rating =
-        rec._rating_count > 0 ? Number((rec._rating_sum / rec._rating_count).toFixed(2)) : 0;
-      delete rec._rating_sum;
-      delete rec._rating_count;
-      fallbackRows.push(rec);
-    }
-    fallbackRows.sort((a, b) => {
-      if (b.total_reviews !== a.total_reviews) return b.total_reviews - a.total_reviews;
-      return b.avg_rating - a.avg_rating;
-    });
-
-    logExecWeekly({ usedFallback: true, records: fallbackRows.length, week: resolvedWeek });
-    return sendExecWeekly(res, fallbackRows, {
-      week: resolvedWeek,
+    return sendExecWeekly(res, rows, {
+      week: effectiveWeek,
       store,
       state: stateRaw,
-      city: cityFilter,
+      city,
       sourceRequested,
-      fallbackUsed: true,
     });
   } catch (e) {
-    return respondExecWeeklyError("execWeekly:unknown", e);
+    console.error("❌ /api/exec-weekly error FULL:", e);
+    respondError(res, "EXEC_WEEKLY_V1", "server_error", 500, {
+      error_detail: e?.message || String(e),
+    });
   }
 });
 

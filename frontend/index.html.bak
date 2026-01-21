@@ -413,9 +413,6 @@
     body.view-ops .view-ops{ display:block; }
     body.view-marketing .view-marketing{ display:block; }
     body.view-cx .view-cx{ display:block; }
-    body.view-main .soften-main{ opacity:.7; }
-    body.view-ops .soften-ops{ display:none; }
-    body.view-cx .soften-cx{ display:none; }
 
     .main-dashboard{
       display:grid;
@@ -438,10 +435,6 @@
     .debug summary{ cursor:pointer; font-weight:600; }
     .debug-grid{ display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:10px; margin-top:10px; }
     .toggle{ display:flex; align-items:center; gap:8px; font-size:12px; }
-    #compareSelect{ white-space:normal; max-width:360px; }
-    #compareSelect option{ white-space:normal; padding:4px 8px; }
-    #compareChips{ align-items:flex-start; }
-    #compareChips .chip{ white-space:normal; }
 
     @media (max-width: 980px){
       .grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
@@ -459,7 +452,6 @@
     <div class="live-row">
       <span class="live-badge mono" id="liveBadge">LIVE: Apify → Supabase (Chicago) • Stores: —</span>
     </div>
-    <div class="hint mono" id="scopeMeta">Scope: Chicago, IL • Source: Apify → Supabase</div>
     <div class="hint mono" id="dataSourceMeta">Data source: LOCAL API • Last updated: —</div>
 
     <div class="subline" id="subline">
@@ -471,12 +463,7 @@
     <div class="toolbar">
 
       <label class="mono">Week:
-        <input id="weekAllToggle" type="checkbox" checked />
-        <span>All weeks (Latest)</span>
-        <input id="weekDate" type="date" disabled />
-        <button id="weekPrev" class="btn-ghost" type="button">Prev</button>
-        <button id="weekNext" class="btn-ghost" type="button">Next</button>
-        <span class="hint mono" id="weekWindow">Week window: Latest (rolling)</span>
+        <select id="weekSelect"></select>
       </label>
 
       <label class="mono">State:
@@ -538,10 +525,6 @@
   </div>
 </div>
 
-    <div class="card view-section view-main" id="viewHeaderMain" style="margin-top:12px;"></div>
-    <div class="card view-section view-ops view-exec" id="viewHeaderWeekly" style="margin-top:12px;"></div>
-    <div class="card view-section view-cx" id="viewHeaderFeedback" style="margin-top:12px;"></div>
-
     <!-- Main Dashboard -->
     <div id="mainDashboard" class="view-section view-main">
       <div class="main-dashboard">
@@ -572,7 +555,7 @@
         </div>
       </div>
 
-      <div class="card clickable soften-main" id="compareCard">
+      <div class="card clickable" id="compareCard">
         <div class="section-title">
           <span>Compare Shops (2–4)</span>
           <span class="hint">Uses loaded data only</span>
@@ -599,7 +582,6 @@
         <div class="summary" id="execSummary">Loading summary…</div>
         <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <button id="execPrimaryBtn" class="btn-primary">Open Primary Action</button>
-          <button id="evidenceBtn" class="btn-ghost">View Evidence</button>
           <span class="hint" id="execPrimaryLabel">—</span>
         </div>
 
@@ -670,10 +652,10 @@
     </div>
 
     <!-- Key Weekly KPIs -->
-    <div class="section-title view-section view-main view-exec view-ops soften-ops" style="margin-top:6px;">
+    <div class="section-title view-section view-main view-exec view-ops" style="margin-top:6px;">
       <span>Weekly KPIs</span>
     </div>
-    <div class="grid view-section view-main view-exec view-ops soften-ops">
+    <div class="grid view-section view-main view-exec view-ops">
       <div class="card clickable" id="kpiCardWeek">
         <div class="kpi-label">Week Ending</div>
         <div class="kpi-value mono" id="kpiWeek">—</div>
@@ -819,19 +801,8 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="evidenceModal">
-      <div class="modal">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-          <div style="font-weight:700;">Evidence</div>
-          <button class="btn-ghost" id="evidenceClose">Close</button>
-        </div>
-        <div id="evidenceBody" style="margin-top:10px; font-size:12px; line-height:1.5;"></div>
-      </div>
-    </div>
-
     <div class="debug" style="margin-top:18px;">
-      <button id="debugToggle" class="btn-ghost" style="margin-bottom:8px;">Show Debug</button>
-      <details id="debugDetails">
+      <details>
         <summary>Debug / Provenance</summary>
         <div class="debug-grid">
           <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
@@ -860,6 +831,7 @@
         </div>
         <div class="mono" style="margin-top:10px; font-size:12px;">
           <div id="dbgUrls">—</div>
+          <div id="dbgEndpoints">—</div>
         </div>
       </details>
     </div>
@@ -953,11 +925,7 @@
 
     const sublineEl = $("subline");
     const sigEl = $("sig");
-    const weekAllToggle = $("weekAllToggle");
-    const weekDateInput = $("weekDate");
-    const weekPrevBtn = $("weekPrev");
-    const weekNextBtn = $("weekNext");
-    const weekWindowEl = $("weekWindow");
+    const weekSelect = $("weekSelect");
     const stateInput = $("stateInput");
     const cityInput = $("cityInput");
     const storeSelect = $("storeSelect");
@@ -970,7 +938,6 @@
     const errorBanner = $("errorBanner");
     const shopsLoadedEl = $("shopsLoaded");
     const liveBadge = $("liveBadge");
-    const scopeMeta = $("scopeMeta");
     const tbody = $("tbody");
     const emptyState = $("emptyState");
     const reviewsMeta = $("reviewsMeta");
@@ -1003,13 +970,6 @@
     const kpiModalBody = $("kpiModalBody");
     const kpiModalEvidence = $("kpiModalEvidence");
     const kpiModalClose = $("kpiModalClose");
-    const evidenceBtn = $("evidenceBtn");
-    const evidenceModal = $("evidenceModal");
-    const evidenceClose = $("evidenceClose");
-    const evidenceBody = $("evidenceBody");
-    const viewHeaderMain = $("viewHeaderMain");
-    const viewHeaderWeekly = $("viewHeaderWeekly");
-    const viewHeaderFeedback = $("viewHeaderFeedback");
     const drawerWeeklySource = $("drawerWeeklySource");
     const drawerReviewSource = $("drawerReviewSource");
     const dbgApiBase = $("dbgApiBase");
@@ -1017,8 +977,7 @@
     const dbgFilters = $("dbgFilters");
     const dbgLastUpdated = $("dbgLastUpdated");
     const dbgUrls = $("dbgUrls");
-    const debugToggle = $("debugToggle");
-    const debugDetails = $("debugDetails");
+    const dbgEndpoints = $("dbgEndpoints");
     const exportCsvBtn = $("exportCsvBtn");
     const openExecJsonBtn = $("openExecJsonBtn");
     const openReviewsJsonBtn = $("openReviewsJsonBtn");
@@ -1042,7 +1001,7 @@
 
     if (!storeId) {
       spName.textContent = "All shops selected";
-      spAddr.textContent = marketFilterLabel();
+      spAddr.textContent = "No market filter applied";
       spMeta.textContent = "Select a shop to view details";
       spMaps.disabled = true;
       spCopy.disabled = true;
@@ -1099,7 +1058,7 @@
 
   function updateDebugPanel(){
     if (dbgApiBase) setText(dbgApiBase, API_BASE);
-    if (dbgCounts) setText(dbgCounts, `shops=${STORES_ALL.length} • weekly=${LAST_EXEC?.records ?? 0} • reviews=${safeNum(LAST_REVIEWS?.records, 0)}`);
+    if (dbgCounts) setText(dbgCounts, `shops=${STORES_ALL.length} • weekly=${LAST_EXEC?.records ?? 0} • reviews=${LAST_REVIEWS?.records ?? 0}`);
     if (dbgFilters) {
       const state = MARKET_FILTERS.state || "—";
       const city = MARKET_FILTERS.city || "—";
@@ -1116,8 +1075,9 @@
       ].filter(Boolean).join(" | ");
       setText(dbgUrls, urls || "—");
     }
-    updateScopeMeta();
-    syncDebugToggle();
+    if (dbgEndpoints) {
+      setText(dbgEndpoints, `meta=${META_URL} | stores=${STORES_URL} | metrics=${METRICS_URL} | weekly=${EXEC_URL} | reviews=${REVIEWS_URL} | debug=${DEBUG_URL}`);
+    }
   }
   function updateDataSourceMeta(lastUpdated){
     if (!dataSourceMeta) return;
@@ -1172,8 +1132,6 @@
     let LAST_METRICS = null;
     let TABLE_LIMIT = 200;
     let DUPLICATE_IDS_FOUND = false;
-    let APPLY_INFLIGHT = false;
-    let CURRENT_WEEK_LABEL = "Latest (all weeks)";
     let TABLE_COMPARE_FILTER = null;
     let STORES_LOGGED = false;
     let MARKET_FILTERS = { state: null, city: null };
@@ -1239,12 +1197,6 @@
       if (t.length === 2) return t.toUpperCase();
       return t;
     }
-    function formatStateLabel(s){
-      const t = normalizeState(s);
-      if (!t) return "";
-      if (t.length === 2) return t.toUpperCase();
-      return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-    }
     function isApifySource(s){
       return String(s ?? "").toLowerCase().includes("apify");
     }
@@ -1273,78 +1225,6 @@
       const t = Date.parse(d);
       return Number.isFinite(t) ? new Date(t) : null;
     }
-    function addDaysIso(dateStr, days){
-      const d = new Date(`${dateStr}T00:00:00Z`);
-      if (Number.isNaN(d.getTime())) return "";
-      d.setUTCDate(d.getUTCDate() + days);
-      return d.toISOString().slice(0, 10);
-    }
-    function snapToMetaWeek(dateStr){
-      if (!dateStr) return "";
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      if (!weeks.length) return dateStr;
-      if (weeks.includes(dateStr)) return dateStr;
-      const target = Date.parse(`${dateStr}T00:00:00Z`);
-      if (!Number.isFinite(target)) return "";
-      let candidate = "";
-      for (const w of weeks){
-        const t = Date.parse(`${w}T00:00:00Z`);
-        if (!Number.isFinite(t)) continue;
-        if (t <= target) candidate = w;
-        else break;
-      }
-      return candidate || weeks[0];
-    }
-    function isAllWeeksSelected(){
-      return weekAllToggle ? !!weekAllToggle.checked : true;
-    }
-    function getSelectedWeek(){
-      if (isAllWeeksSelected()) return "";
-      const raw = weekDateInput ? weekDateInput.value : "";
-      return raw ? snapToMetaWeek(raw) : "";
-    }
-    function hasAnyReviews(){
-      return safeNum(LAST_REVIEWS?.records, 0) > 0;
-    }
-    function syncWeekControls(preferredWeek){
-      if (!weekAllToggle || !weekDateInput) return;
-      weekDateInput.disabled = !!weekAllToggle.checked;
-      if (weekPrevBtn) weekPrevBtn.disabled = !!weekAllToggle.checked;
-      if (weekNextBtn) weekNextBtn.disabled = !!weekAllToggle.checked;
-      if (weekAllToggle.checked) {
-        weekDateInput.value = "";
-        return;
-      }
-      const candidate =
-        preferredWeek ||
-        (LAST_EXEC && LAST_EXEC.week_ending) ||
-        (META?.weeks || [])[0] ||
-        "";
-      if (candidate) weekDateInput.value = snapToMetaWeek(candidate);
-    }
-    function updateWeekWindowLabel(){
-      if (!weekWindowEl) return;
-      const selected = getSelectedWeek();
-      if (!selected) {
-        setText(weekWindowEl, "Week window: Latest (rolling)");
-        return;
-      }
-      const end = addDaysIso(selected, 6);
-      setText(weekWindowEl, `Week window: ${selected} \u2192 ${end || "—"}`);
-    }
-    function updateWeekNavButtons(){
-      if (!weekPrevBtn || !weekNextBtn) return;
-      if (isAllWeeksSelected()) {
-        weekPrevBtn.disabled = true;
-        weekNextBtn.disabled = true;
-        return;
-      }
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      weekPrevBtn.disabled = idx <= 0;
-      weekNextBtn.disabled = idx === -1 || idx >= weeks.length - 1;
-    }
     function normalizeName(s){
       return String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
     }
@@ -1363,26 +1243,6 @@
         state: stateRaw ? stateRaw.toUpperCase() : null,
         city: cityRaw || null
       };
-    }
-    function marketFilterLabel(){
-      const state = formatStateLabel(MARKET_FILTERS.state);
-      const city = (MARKET_FILTERS.city || "").trim();
-      if (state || city) {
-        return `Market filter: ${state || "—"}${city ? ` / ${city}` : ""}`;
-      }
-      return "Market filter: none";
-    }
-    function updateScopeMeta(){
-      if (!scopeMeta) return;
-      const city = (MARKET_FILTERS.city || "").trim();
-      const stateLabel = formatStateLabel(MARKET_FILTERS.state);
-      const shortState = stateLabel === "Illinois" ? "IL" : stateLabel;
-      const scope = [city, shortState].filter(Boolean).join(", ") || "All markets";
-      setText(scopeMeta, `Scope: ${scope} • Source: Apify → Supabase`);
-    }
-    function syncDebugToggle(){
-      if (!debugToggle || !debugDetails) return;
-      debugToggle.textContent = debugDetails.open ? "Hide Debug" : "Show Debug";
     }
     function setMarketFiltersInInputs(filters){
       if (stateInput) stateInput.value = (filters?.state || "").toUpperCase();
@@ -1674,10 +1534,13 @@
       updateDataSourceMeta(json.last_updated);
       console.info("META fetch", { url: META_URL, weeks: (json.weeks || []).length });
 
-      const current = preferredWeek ?? getSelectedWeek();
-      syncWeekControls(current);
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
+      const weeks = META.weeks || [];
+      const current = preferredWeek ?? (weekSelect ? weekSelect.value : "");
+      populateSelect(weekSelect, weeks, { includeAllLabel: "Latest (all weeks)" });
+      if (weekSelect) {
+        if (current && weeks.includes(current)) weekSelect.value = current;
+        else weekSelect.value = "";
+      }
       if (sourceSelect) {
         sourceSelect.innerHTML = "";
         sourceSelect.disabled = true;
@@ -1701,7 +1564,7 @@
 
     async function loadDebug(){
       const qs = buildMarketQuery(MARKET_FILTERS);
-     const url = DEBUG_URL;
+      const url = qs.toString() ? `${DEBUG_URL}?${qs.toString()}` : DEBUG_URL;
       LAST_URLS.debug = url;
       log(`GET ${url}`);
       try {
@@ -1730,6 +1593,7 @@
       qs.set("source", "apify");
       qs.set("limit", "2000");
       if (MARKET_FILTERS.state) qs.set("state", MARKET_FILTERS.state);
+      if (MARKET_FILTERS.city) qs.set("city", MARKET_FILTERS.city);
       const url = `${EXEC_URL}?${qs.toString()}`;
       LAST_URLS.weekly = url;
       log(`validate week: ${url}`);
@@ -1750,13 +1614,11 @@
 
     async function ensureDefaultWeek(){
       const weeks = META?.weeks || [];
-      if (!weeks.length || !weekDateInput || isAllWeeksSelected()) return;
-      if (weekDateInput.value && weeks.includes(weekDateInput.value)) return;
+      if (!weeks.length || !weekSelect) return;
+      if (weekSelect.value && weeks.includes(weekSelect.value)) return;
       setLoadingState("Selecting default week…");
       const chosen = await chooseDefaultWeek(weeks);
-      weekDateInput.value = chosen || "";
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
+      weekSelect.value = chosen || "";
     }
 
     function applyStoreSearch(){
@@ -1811,7 +1673,7 @@
 
     async function loadDashboard({ store, week } = {}){
       const storeId = store ?? (storeSelect ? storeSelect.value : "");
-      const weekVal = week ?? getSelectedWeek();
+      const weekVal = week ?? (weekSelect ? weekSelect.value : "");
       const source = currentSource();
       const state = MARKET_FILTERS.state;
       const city = MARKET_FILTERS.city;
@@ -1824,7 +1686,6 @@
       if (city) qs.set("city", city);
       qs.set("limit", "5000");
 
-      qs.delete("city"); // exec_weekly has no city; prevents 0-row wipeout
       const url = qs.toString() ? `${EXEC_URL}?${qs.toString()}` : EXEC_URL;
 
       LAST_URLS.weekly = url;
@@ -1856,9 +1717,7 @@
       });
 
       const k = execJson.kpis || {};
-      const weekLabel = CURRENT_WEEK_LABEL
-        || (isAllWeeksSelected() ? "Latest (all weeks)" : (LAST_EXEC?.week_ending || getSelectedWeek() || "—"));
-      setText($("kpiWeek"), weekLabel);
+      setText($("kpiWeek"), (execJson.week_ending || weekVal || "—"));
       setText($("kpiStores"), fmt(k.stores_reporting ?? 0));
       setText($("kpiReviews"), fmt(k.total_reviews ?? 0));
       setText($("kpiAvgStars"), fmt2(k.avg_stars_overall ?? 0));
@@ -1917,31 +1776,10 @@
       const storesReporting = safeNum(k.stores_reporting, 0);
       const totalReviews = safeNum(k.total_reviews, 0);
       const avgStars = safeNum(k.avg_stars_overall, 0);
-      const reviewRows = (LAST_REVIEWS?.rows || reviewsJson?.rows || []);
+      const reviewRows = reviewsJson?.rows || [];
       const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
       const negCount = rated.filter(x => x <= 2).length;
       const negPct = rated.length ? Math.round((negCount / rated.length) * 100) : 0;
-      const weeklyCount = safeNum(execJson?.records, 0);
-      const reviewCount = safeNum(LAST_REVIEWS?.records, 0);
-      const storeSelected = !!(storeSelect && storeSelect.value);
-
-      if (storeSelected && (weeklyCount === 0 || reviewCount === 0)) {
-        const msg = "No data matched this shop. This may indicate store_id mismatch between endpoints.";
-        setHTML(glanceList, `<li>${escapeHtml(msg)}</li>`);
-        setText(glanceStamp, new Date().toLocaleTimeString());
-        setHTML(topList, msg);
-        setHTML(bottomList, msg);
-        return;
-      }
-
-      if (weeklyCount < 3) {
-        const msg = "Not enough data for ranking. Need ≥ 3 shops reporting for this week/scope.";
-        setHTML(glanceList, `<li>${escapeHtml(msg)}</li>`);
-        setText(glanceStamp, new Date().toLocaleTimeString());
-        setHTML(topList, msg);
-        setHTML(bottomList, msg);
-        return;
-      }
 
       const sortedByAvg = [...rows].sort((a,b) => a.avg - b.avg);
       const worst = sortedByAvg[0];
@@ -1995,7 +1833,7 @@
     function openKpiModal(type){
       if (!kpiModal || !kpiModalBody || !kpiModalTitle) return;
       const k = LAST_EXEC?.kpis || {};
-      const weekText = CURRENT_WEEK_LABEL || LAST_EXEC?.week_ending || "—";
+      const weekText = LAST_EXEC?.week_ending || "—";
       const total = fmt(k.total_reviews ?? 0);
       const stores = fmt(k.stores_reporting ?? 0);
       const avg = fmt2(k.avg_stars_overall ?? 0);
@@ -2127,7 +1965,7 @@
     function renderTable(rows){
       if (tbody) setHTML(tbody, "");
 
-      const week = getSelectedWeek();
+      const week = weekSelect ? weekSelect.value : "";
       let filtered = rows.map(normalizeRow);
 
       if (week){
@@ -2379,10 +2217,7 @@
         } else {
           const rows = (json.rows || []);
           if (!rows.length){
-            const msg = hasAnyReviews()
-              ? "No matching entries for this shop filter."
-              : "No reviews found for current market filter.";
-            if (drawerReviews) setHTML(drawerReviews, `<div class="empty">${escapeHtml(msg)}</div>`);
+            if (drawerReviews) setHTML(drawerReviews, `<div class="empty">No reviews found for this shop/source filter.</div>`);
           } else {
             if (drawerReviews) setHTML(drawerReviews, rows.map(r => {
               const date = r.review_date ? escapeHtml(r.review_date) : "";
@@ -2640,15 +2475,7 @@
     function renderPlatformBars(mix){
       if (platformBarsEl) setHTML(platformBarsEl, "");
       if (!mix.length){
-        const reviewCount = safeNum(LAST_REVIEWS?.records, 0);
-        if (platformBarsEl) {
-          setHTML(
-            platformBarsEl,
-            reviewCount > 0
-              ? `<div class="empty">Feedback sample: ${fmt(reviewCount)} reviews</div>`
-              : ""
-          );
-        }
+        if (platformBarsEl) setHTML(platformBarsEl, `<div class="empty">No reviews loaded yet.</div>`);
         return;
       }
       const total = mix.reduce((a,b)=>a+b.v,0) || 1;
@@ -2675,8 +2502,7 @@
       const total = safeNum(k.total_reviews, 0);
       const avgStars = safeNum(k.avg_stars_overall, 0);
 
-      const reviewRows = (LAST_REVIEWS?.rows || reviewsJson?.rows || []);
-      const reviewCount = safeNum(LAST_REVIEWS?.records ?? reviewsJson?.records ?? 0, 0);
+      const reviewRows = reviewsJson?.rows || [];
       const ratings = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
       const avgReview = ratings.length ? (ratings.reduce((a,b)=>a+b,0) / ratings.length) : 0;
       const negCount = ratings.filter(x => x <= 2).length;
@@ -2685,7 +2511,7 @@
       const worst = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.avg - b.avg)[0];
       const drop = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.dStars - b.dStars)[0];
 
-      const weekText = CURRENT_WEEK_LABEL || "Latest (all weeks)";
+      const weekText = execJson?.week_ending || ((weekSelect && weekSelect.value) || "latest");
       const platformText = displaySourceName(currentSource());
       const storeText = (storeSelect && storeSelect.value)
         ? (getStoreById(storeSelect.value)?.name || "selected shop")
@@ -2697,16 +2523,10 @@
       lines.push(`Status: ${status} • Week: ${weekText}`);
       lines.push(`Scope: ${storeText} • ${platformText}`);
       lines.push(`Key metrics: ${fmt(stores)} shops reporting • ${fmt(total)} reviews • avg ${fmt2(avgStars)}★`);
-      if (reviewCount > 0){
-        lines.push(`Feedback sample: ${fmt(reviewCount)} reviews`);
-      }
       if (ratings.length){
         lines.push(`Customer signals: ${fmt(ratings.length)} rated reviews • avg ${fmt2(avgReview)}★ • negative ${negPct.toFixed(0)}% (≤2★)`);
-      }
-      const fallbackUsed = !!execJson?.meta?.fallbackUsed;
-      const execRowCount = (execJson?.rows || []).length;
-      if (fallbackUsed){
-        lines.push(execRowCount ? "Data note: Derived from latest available reviews" : "No weekly rollup found for this market/week");
+      } else {
+        lines.push(`Customer signals: no rated reviews returned for current filters.`);
       }
 
       setText(execSummaryEl, lines.join("\n"));
@@ -2720,10 +2540,6 @@
         execPrimaryBtn.onclick = () => {
           if (primary) selectStoreFromRow(primary.raw);
         };
-      }
-
-      if (evidenceBtn) {
-        evidenceBtn.disabled = false;
       }
 
       // badges
@@ -2747,173 +2563,154 @@
       renderPlatformBars(mix);
     }
 
-    function updateViewHeaders(){
-      const k = LAST_EXEC?.kpis || {};
-      const stores = safeNum(k.stores_reporting, 0);
-      const totalReviews = safeNum(k.total_reviews, 0);
-      const avgStars = safeNum(k.avg_stars_overall, 0);
-      const reviewRows = LAST_REVIEWS?.rows || [];
-      const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
-      const avgReview = rated.length ? (rated.reduce((a,b)=>a+b,0) / rated.length) : 0;
-      const weekLabel = CURRENT_WEEK_LABEL || "Latest (all weeks)";
-      if (viewHeaderMain) {
-        setHTML(viewHeaderMain, `<strong>Executive Overview</strong> • ${weekLabel} • shops ${fmt(stores)} • reviews ${fmt(totalReviews)} • avg ${fmt2(avgStars)}★`);
-      }
-      if (viewHeaderWeekly) {
-        setHTML(viewHeaderWeekly, `<strong>Weekly Summary</strong> • ${weekLabel} • records ${fmt(LAST_EXEC?.records ?? 0)} • shops ${fmt(stores)} • avg ${fmt2(avgStars)}★`);
-      }
-      if (viewHeaderFeedback) {
-        setHTML(viewHeaderFeedback, `<strong>Feedback Summary</strong> • ${weekLabel} • reviews ${fmt(LAST_REVIEWS?.records ?? 0)} • rated ${fmt(rated.length)} • avg ${fmt2(avgReview)}★`);
-      }
-    }
-
     async function loadReviews(){
-      try{
-        const store_id = storeSelect ? String(storeSelect.value || "").trim() : "";
-        const source = currentSource();
+      const store_id = storeSelect ? storeSelect.value : "";
+      const source = currentSource();
 
-        const stateVal = (stateInput?.value || MARKET_FILTERS.state || "").toString().trim();
-        const cityVal  = (cityInput?.value  || MARKET_FILTERS.city  || "").toString().trim();
+      const qs = new URLSearchParams();
+      qs.set("limit", "60");
+      if (store_id) qs.set("store_id", store_id);
+      if (source) qs.set("source", source);
 
-        const qs = new URLSearchParams();
-        qs.set("limit","60");
-        if (store_id) qs.set("store_id", store_id);
-        if (source) qs.set("source", source);
-        if (stateVal) qs.set("state", stateVal);
-        if (cityVal) qs.set("city", cityVal);
+      const url = `${REVIEWS_URL}?${qs.toString()}`;
+      LAST_URLS.reviews = url;
+      log(`GET ${url}`);
 
-        const url = `${REVIEWS_URL}?${qs.toString()}`;
-        LAST_URLS = LAST_URLS || {};
-        LAST_URLS.reviews = url;
-
-        const json = await fetchJSON(url);
-
-        const normalizedRows = (json?.rows || []).map(r => ({
-          store_id: String(r.store_id ?? r.storeId ?? r.store_id_resolved_to ?? "") || null,
-          state: (r.state || "").toString(),
-          city: (r.city || "").toString(),
-          rating: safeNum(r.rating ?? r.stars ?? r.score, 0),
-          review_text: r.review_text ?? r.text ?? r.content ?? null,
-          reviewer_name: r.reviewer_name ?? r.reviewerName ?? null,
-          review_date: r.review_date ?? r.date ?? r.publishedAt ?? r.created_at ?? r.time ?? null,
-          url: r.url ?? r.review_url ?? r.reviewUrl ?? null
-        }));
-
-        const marketState = normalizeField(stateVal || "");
-        const marketCity  = normalizeField(cityVal  || "");
-
-        const marketRows = (marketState || marketCity)
-          ? normalizedRows.filter(r => {
-              const rs = normalizeField(r.state);
-              const rc = normalizeField(r.city);
-              const stateOk =
-                !marketState ||
-                rs === marketState ||
-                (marketState === "il" && rs === "illinois") ||
-                (marketState === "illinois" && rs === "il");
-              const cityOk = !marketCity || rc === marketCity;
-              return stateOk && cityOk;
-            })
-          : normalizedRows;
-
-        const storeRows = store_id
-          ? marketRows.filter(r => String(r.store_id || "") === store_id)
-          : marketRows;
-
-        const reviewsJson = { ...json, rows: storeRows, records: storeRows.length };
-        LAST_REVIEWS = reviewsJson;
-
-        console.info("REVIEWS fetch", { url, records: reviewsJson.records });
-
-        if (!json?.ok){
-          setText(reviewsMeta, "Failed to load reviews");
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(json?.error || "Unknown error")}</div>`);
-          updateReviewInsights([], "—");
-          updateDebugPanel();
-          return null;
-        }
-
-        const selectedStore = store_id ? getStoreById(store_id) : null;
-        const storeLabelText = selectedStore?.name || (store_id ? "Selected shop" : "All shops");
-        const filtered = storeRows;
-
-        const sorted = filtered.slice().sort((a,b) => {
-          const da = parseDateSafe(a.review_date)?.getTime() || 0;
-          const db = parseDateSafe(b.review_date)?.getTime() || 0;
-          return db - da;
-        });
-        const displayRows = sorted.slice(0, 18);
-
-        const plat = source ? displaySourceName(source) : "All sources";
-        if (reviewsTitle) {
-          setText(reviewsTitle, store_id ? `Feedback for: ${storeLabelText}` : "Feedback: All shops");
-        }
-        const countText = filtered.length
-          ? `Showing ${fmt(displayRows.length)} of ${fmt(filtered.length)} reviews`
-          : "";
-        setText(reviewsMeta, countText ? `${storeLabelText} • ${plat} • ${countText}` : `${storeLabelText} • ${plat}`);
-
-        updateReviewInsights(sorted, storeLabelText);
-        updateMarketingCx(sorted);
-
-        if (!filtered.length){
-          const msg = hasAnyReviews()
-            ? (store_id ? "No matching entries for this shop filter." : "No matching entries for this filter.")
-            : "No reviews found for current market filter.";
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(msg)}</div>`);
-          updateDebugPanel();
-          return reviewsJson;
-        }
-
-        if (reviewsList) setHTML(reviewsList, displayRows.map(r => {
-          const date = r.review_date ? escapeHtml(r.review_date) : "";
-          const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
-          const txt = r.review_text ? escapeHtml(r.review_text) : "";
-          const link = r.url ? escapeHtml(r.url) : "";
-          const rating = safeNum(r.rating, 0);
-          const ratingText = Number.isFinite(rating) && rating > 0 ? rating : null;
-
-          const tags = [];
-          if (ratingText) tags.push(`<span class="tag mono">${ratingText.toFixed(0)}★</span>`);
-          if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
-
-          return `
-            <div class="review-card">
-              <div class="review-top">
-                <div>
-                  <div class="review-name">${who}</div>
-                  <div class="review-meta">${date}</div>
-                </div>
-                <div class="review-stars">${ratingText ? stars(ratingText) : "—"}</div>
-              </div>
-
-              <div class="review-tags">${tags.join("")}</div>
-              <div class="review-text">${txt || "<span style='color:var(--muted);'>No text</span>"}</div>
-              ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
-            </div>
-          `;
-        }).join(""));
-
-        updateDebugPanel();
-        return reviewsJson;
-      } catch(e){
-        showError(`Reviews failed: ${String(e.message || e)}`);
-        return null;
+      let json = await fetchJSON(url);
+      let rows = (json.rows || []);
+      let relaxedSource = false;
+      if (!rows.length && source) {
+        const relaxedUrl = `${REVIEWS_URL}?limit=60${store_id ? `&store_id=${encodeURIComponent(store_id)}` : ""}`;
+        try {
+          const relaxedJson = await fetchJSON(relaxedUrl);
+          if (relaxedJson?.rows?.length) {
+            rows = relaxedJson.rows;
+            json = relaxedJson;
+            showWarning("Source filter relaxed (no Google Reviews rows detected).");
+            relaxedSource = true;
+          }
+        } catch {}
       }
+      if (!rows.length && store_id) {
+        const nameFallbackUrl = `${REVIEWS_URL}?limit=60${source ? `&source=${encodeURIComponent(source)}` : ""}`;
+        try {
+          const nameJson = await fetchJSON(nameFallbackUrl);
+          if (nameJson?.rows?.length) {
+            rows = nameJson.rows;
+            json = nameJson;
+          }
+        } catch {}
+      }
+      const normalizedRows = rows.map(normalizeReviewRow);
+      const allowedStoreIds = new Set((STORES_ALL || [])
+        .map(s => String(s.id || s.place_id || s.store_id || ""))
+        .filter(Boolean));
+      const allowedStoreNames = new Set((STORES_ALL || [])
+        .map(s => normalizeName(s.name || s.store_name || s.place_name || ""))
+        .filter(Boolean));
+      const scopedRows = normalizedRows.filter(r => {
+        const sid = String(r.storeId || r.store_id || "");
+        if (sid && allowedStoreIds.has(sid)) return true;
+        const sn = normalizeName(r.storeName || r.store_name || "");
+        return sn && allowedStoreNames.has(sn);
+      });
+      const reviewsJson = { ...json, rows: scopedRows, records: scopedRows.length };
+      LAST_REVIEWS = reviewsJson;
+      console.info("REVIEWS fetch", { url, records: scopedRows.length });
+
+      if (!json.ok){
+        setText(reviewsMeta, "Failed to load reviews");
+        if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(json.error || "Unknown error")}</div>`);
+        updateReviewInsights([], "—");
+        showError(`Reviews failed: ${json.error || "Unknown error"}`);
+        return;
+      }
+
+      const selectedStore = store_id ? getStoreById(store_id) : null;
+      const storeLabelText = selectedStore?.name || (store_id ? "Selected shop" : "All shops");
+
+      let filtered = scopedRows;
+      if (store_id) {
+        const byId = scopedRows.filter(r => r.storeId && String(r.storeId) === String(store_id));
+        if (byId.length) {
+          filtered = byId;
+        } else {
+          const target = normalizeName(storeLabelText);
+          filtered = scopedRows.filter(r => normalizeName(r.storeName) === target);
+        }
+      }
+
+      const sorted = filtered.slice().sort((a,b) => {
+        const da = parseDateSafe(a.review_date)?.getTime() || 0;
+        const db = parseDateSafe(b.review_date)?.getTime() || 0;
+        return db - da;
+      });
+      const displayRows = sorted.slice(0, 18);
+
+      const plat = source ? displaySourceName(source) : "All sources";
+      if (reviewsTitle) {
+        setText(reviewsTitle, store_id ? `Feedback for: ${storeLabelText}` : "Feedback: All shops");
+      }
+      const countText = `Showing ${fmt(displayRows.length)} of ${fmt(filtered.length)} reviews`;
+      setText(reviewsMeta, `${storeLabelText} • ${plat} • ${countText}`);
+
+      updateReviewInsights(sorted, storeLabelText);
+      updateMarketingCx(sorted);
+
+      // executive summary uses BOTH exec+reviews
+      if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, reviewsJson);
+
+      if (!scopedRows.length){
+        if (reviewsList) setHTML(reviewsList, `<div class="empty">No reviews found for this filter.</div>`);
+        return;
+      }
+      if (!filtered.length){
+        if (reviewsList) {
+          setHTML(reviewsList, `<div class="empty">No feedback matched the selected shop. This may indicate shop IDs differ between endpoints.</div>`);
+        }
+        updateReviewInsights([], storeLabelText);
+        updateMarketingCx([]);
+        return;
+      }
+
+      if (reviewsList) setHTML(reviewsList, displayRows.map(r => {
+        const date = r.review_date ? escapeHtml(r.review_date) : "";
+        const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
+        const src = r.source ? escapeHtml(displaySourceName(r.source)) : "";
+        const txt = r.review_text ? escapeHtml(r.review_text) : "";
+        const link = r.url ? escapeHtml(r.url) : "";
+        const rating = safeNum(r.rating ?? r.stars ?? r.score, 0);
+        const ratingText = Number.isFinite(rating) && rating > 0 ? rating : null;
+
+        const tags = [];
+        if (src) tags.push(`<span class="tag mono">${escapeHtml(displaySourceName(src))}</span>`);
+        if (ratingText) tags.push(`<span class="tag mono">${ratingText.toFixed(0)}★</span>`);
+        if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
+
+        return `
+          <div class="review-card">
+            <div class="review-top">
+              <div>
+                <div class="review-name">${who}</div>
+                <div class="review-meta">${date}${src ? ` • <span style="color:#8ad;">${src}</span>` : ""}</div>
+              </div>
+              <div class="review-stars">${ratingText ? stars(ratingText) : "—"}</div>
+            </div>
+
+            <div class="review-tags">${tags.join("")}</div>
+            <div class="review-text">${txt || "<span style='color:var(--muted);'>No text</span>"}</div>
+            ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
+          </div>
+        `;
+      }).join(""));
     }
-
-
 
     async function runApply(){
       try{
-        if (APPLY_INFLIGHT) return;
-        APPLY_INFLIGHT = true;
         clearError();
         setLoadingState("Loading weekly data…");
-        const week = getSelectedWeek();
+        const week = weekSelect ? weekSelect.value : "";
         const store = storeSelect ? storeSelect.value : "";
-        await loadMeta({ preferredWeek: week });
-        await ensureDefaultWeek();
         const storeUpdate = await loadStores();
         if (storeUpdate?.aborted) return;
         if (storeUpdate?.clearedStore) {
@@ -2922,24 +2719,12 @@
           await loadDashboard({ store, week });
         }
         await loadMetrics();
-        const reviewsJson = await loadReviews();
-        const selectedWeek = getSelectedWeek();
-        CURRENT_WEEK_LABEL = selectedWeek
-          ? (LAST_EXEC?.week_ending || selectedWeek)
-          : "Latest (all weeks)";
-        setText($("kpiWeek"), CURRENT_WEEK_LABEL || "Latest (all weeks)");
-        updateWeekWindowLabel();
-        updateWeekNavButtons();
-        console.info("APPLY complete", { week: getSelectedWeek(), state: MARKET_FILTERS.state, city: MARKET_FILTERS.city, weekly: LAST_EXEC?.records, reviews: LAST_REVIEWS?.records });
+        await loadReviews();
         await loadDebug();
-        if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, reviewsJson || LAST_REVIEWS);
         renderMainDashboard(LAST_EXEC, LAST_REVIEWS);
-        updateViewHeaders();
         updateDebugPanel();
       }catch(e){
         showError(String(e.message || e));
-      } finally {
-        APPLY_INFLIGHT = false;
       }
     }
 
@@ -2947,6 +2732,8 @@
     addListener(reloadBtn, "click", async () => {
       try{
         clearError();
+        await loadMeta({ preferredWeek: weekSelect ? weekSelect.value : "" });
+        await ensureDefaultWeek();
         await runApply();
       }catch(e){
         showError(String(e.message || e));
@@ -2999,12 +2786,6 @@
       }
       renderCompare();
     });
-    addListener(debugToggle, "click", () => {
-      if (!debugDetails) return;
-      debugDetails.open = !debugDetails.open;
-      syncDebugToggle();
-    });
-    addListener(debugDetails, "toggle", syncDebugToggle);
 
     addListener(loadMoreBtn, "click", () => {
       TABLE_LIMIT += 200;
@@ -3029,64 +2810,9 @@
       w.document.write(`<pre style="white-space:pre-wrap;font-family:ui-monospace">${pretty.replaceAll("<","&lt;")}</pre>`);
       w.document.close();
     });
-    addListener(evidenceBtn, "click", () => {
-      if (!evidenceModal || !evidenceBody) return;
-      const storeId = storeSelect ? storeSelect.value : "";
-      const storeLabelText = storeId ? (getStoreById(storeId)?.name || "Selected shop") : "All shops";
-      const weeklyUrl = LAST_URLS?.weekly || "—";
-      const reviewsUrl = LAST_URLS?.reviews || "—";
-      setHTML(evidenceBody, `
-        <div><strong>Store</strong>: ${escapeHtml(storeLabelText)}${storeId ? ` (${escapeHtml(storeId)})` : ""}</div>
-        <div><strong>exec-weekly URL</strong>: <span class="mono">${escapeHtml(weeklyUrl)}</span></div>
-        <div><strong>reviews URL</strong>: <span class="mono">${escapeHtml(reviewsUrl)}</span></div>
-      `);
-      showEl(evidenceModal, "flex");
-    });
-    addListener(evidenceClose, "click", () => hideEl(evidenceModal));
-    addListener(evidenceModal, "click", (e) => {
-      if (e.target === evidenceModal) hideEl(evidenceModal);
-    });
 
     // Auto-apply changes
-    const debouncedWeekApply = debounce(() => runApply(), 300);
-    addListener(weekAllToggle, "change", () => {
-      syncWeekControls();
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
-      debouncedWeekApply();
-    });
-    addListener(weekDateInput, "change", () => {
-      if (!weekDateInput) return;
-      const snapped = snapToMetaWeek(weekDateInput.value);
-      if (snapped) weekDateInput.value = snapped;
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
-      debouncedWeekApply();
-    });
-    addListener(weekPrevBtn, "click", () => {
-      if (!weekDateInput) return;
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      if (idx > 0) {
-        weekDateInput.value = weeks[idx - 1];
-        updateWeekNavButtons();
-        updateWeekWindowLabel();
-        debouncedWeekApply();
-      }
-    });
-    addListener(weekNextBtn, "click", () => {
-      if (!weekDateInput) return;
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      if (idx > -1 && idx < weeks.length - 1) {
-        weekDateInput.value = weeks[idx + 1];
-        updateWeekNavButtons();
-        updateWeekWindowLabel();
-        debouncedWeekApply();
-      }
-    });
+    addListener(weekSelect, "change", runApply);
     addListener(storeSelect, "change", async () => {
       renderStoreProfile(storeSelect ? storeSelect.value : "");
       await runApply();
@@ -3096,6 +2822,8 @@
     addListener(applyBtn, "click", async () => {
       MARKET_FILTERS = getMarketFiltersFromInputs();
       persistMarketFilters(MARKET_FILTERS);
+      await loadMeta({ preferredWeek: weekSelect ? weekSelect.value : "" });
+      await ensureDefaultWeek();
       await runApply();
     });
 
@@ -3126,9 +2854,6 @@
           city: urlFilters.city ?? storedFilters.city ?? "Chicago"
         };
         setMarketFiltersInInputs(MARKET_FILTERS);
-        syncWeekControls();
-        updateScopeMeta();
-        syncDebugToggle();
         if (themeSelect) {
           const theme = localStorage.getItem("pb1_theme") || "dark";
           themeSelect.value = theme;
@@ -3136,6 +2861,8 @@
         }
         clearError();
         setLoadingState("Loading metadata…");
+        await loadMeta();
+        await ensureDefaultWeek();
         await runApply();
       }catch(e){
         console.error(e);

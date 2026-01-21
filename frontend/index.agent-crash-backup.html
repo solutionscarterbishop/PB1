@@ -10,7 +10,6 @@
       --card:#1a1212;
       --card2:#130d0d;
       --text:#f7f2f2;
-      --text-strong:#fff7f7;
       --muted:#b7a9a9;
       --border:rgba(255,255,255,.08);
       --shadow: 0 12px 32px rgba(0,0,0,.45);
@@ -24,20 +23,19 @@
       --bad:  rgba(230,120,120,.14);
     }
     body[data-theme="light"]{
-      --bg:#f7f2ee;
-      --card:#fffaf6;
-      --card2:#f3ebe5;
-      --text:#2b1a1a;
-      --text-strong:#1f1212;
-      --muted:#5f4d4d;
-      --border:rgba(60,30,30,.18);
-      --shadow: 0 10px 22px rgba(40,10,10,.16);
-      --glow: 0 0 0 1px rgba(60,30,30,.12), 0 10px 26px rgba(40,10,10,.10);
+      --bg:#f6f1ee;
+      --card:#fff7f2;
+      --card2:#f6efe9;
+      --text:#2a1b1b;
+      --muted:#6d5c5c;
+      --border:rgba(30,10,10,.10);
+      --shadow: 0 10px 24px rgba(40,10,10,.12);
+      --glow: 0 0 0 1px rgba(30,10,10,.08), 0 10px 28px rgba(40,10,10,.10);
       --accent:#7a1f1f;
       --accent-strong:#8e1f1f;
-      --good: rgba(50,150,100,.22);
-      --warn: rgba(210,160,80,.22);
-      --bad:  rgba(200,80,80,.18);
+      --good: rgba(70,170,120,.18);
+      --warn: rgba(210,160,80,.16);
+      --bad:  rgba(210,90,90,.14);
     }
     *{ box-sizing:border-box; }
     body{
@@ -53,37 +51,9 @@
 
     .wrap{ max-width: 1240px; margin: 0 auto; }
 
-    h1{ margin:0 0 6px 0; font-size:42px; letter-spacing:-0.5px; color:var(--text-strong); }
-    .live-row{ display:flex; gap:10px; align-items:center; margin:4px 0 10px; flex-wrap:wrap; }
-    .live-badge{
-      padding:6px 12px;
-      border-radius:999px;
-      border:1px solid rgba(90,200,130,.35);
-      background: rgba(90,200,130,.12);
-      font-size:12px;
-      color: var(--text-strong);
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-    }
-    .live-badge::before{
-      content:"";
-      width:7px;
-      height:7px;
-      border-radius:50%;
-      background:#4fd087;
-      box-shadow:0 0 8px rgba(79,208,135,.7);
-      display:inline-block;
-    }
+    h1{ margin:0 0 6px 0; font-size:42px; letter-spacing:-0.5px; }
     .subline{ color:var(--muted); font-size:13px; margin-bottom:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .pill{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,.03); }
-    body[data-theme="light"] .pill,
-    body[data-theme="light"] .badge,
-    body[data-theme="light"] .chip,
-    body[data-theme="light"] .tag{
-      background: rgba(0,0,0,.03);
-      border-color: var(--border);
-    }
 
     .error-banner{
       display:none;
@@ -110,17 +80,7 @@
       background: rgba(255,255,255,.02);
       box-shadow: var(--glow);
     }
-    select, input{
-      height:40px;
-      border-radius:12px;
-      border:1px solid var(--border);
-      background:var(--card2);
-      color:var(--text);
-      padding:0 12px;
-      outline:none;
-      box-shadow:none;
-    }
-    button{
+    select, button, input{
       height:40px;
       border-radius:12px;
       border:1px solid var(--border);
@@ -135,7 +95,7 @@
     button:hover{ background:rgba(255,255,255,.06); }
     .btn-ghost{ background:rgba(255,255,255,.02); }
     .btn-ghost:hover{ background:rgba(255,255,255,.05); }
-    .btn-primary{ border-color: rgba(255,255,255,.18); background:var(--accent); color:#fff; }
+    .btn-primary{ border-color: rgba(255,255,255,.18); background:var(--accent); }
     .btn-primary:hover{ background:var(--accent-strong); }
 
     .grid{
@@ -154,12 +114,12 @@
     }
     .kpi-label{ font-size:12px; color:var(--muted); margin-bottom:8px; }
     .kpi-value{ font-size:30px; font-weight:700; letter-spacing:-0.4px; }
-    .kpi-sub{ font-size:12px; color: var(--muted); margin-top: 6px; }
+    .kpi-sub{ font-size:12px; color: rgba(255,255,255,.65); margin-top: 6px; }
 
     .section-title{
       margin:18px 0 10px;
       font-size:16px;
-      color:var(--text-strong);
+      color:var(--text);
       font-weight:700;
       display:flex;
       align-items:center;
@@ -198,7 +158,7 @@
     thead th.sortable:hover{ background: rgba(255,255,255,.045); }
     tbody td{
       padding:12px 12px;
-      border-bottom:1px solid var(--border);
+      border-bottom:1px solid rgba(255,255,255,.06);
       vertical-align: top;
     }
     tbody tr{ cursor:pointer; }
@@ -233,7 +193,7 @@
       letter-spacing:-0.2px;
     }
     .summary{
-      color: var(--text);
+      color: rgba(255,255,255,.86);
       font-size:13px;
       line-height:1.45;
       white-space:pre-wrap;
@@ -245,11 +205,11 @@
       border:1px solid var(--border);
       background: rgba(255,255,255,.02);
       font-size:12px;
-      color: var(--text);
+      color: rgba(255,255,255,.8);
     }
     .barWrap{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
     .barRow{ display:flex; align-items:center; gap:10px; }
-    .barLbl{ width:82px; font-size:12px; color: var(--muted); }
+    .barLbl{ width:82px; font-size:12px; color: rgba(255,255,255,.72); }
     .bar{
       flex:1;
       height:10px;
@@ -264,7 +224,7 @@
       width:0%;
       background: rgba(255,255,255,.85);
     }
-    .barVal{ width:56px; text-align:right; font-size:12px; color: var(--muted); }
+    .barVal{ width:56px; text-align:right; font-size:12px; color: rgba(255,255,255,.72); }
 
     /* Priority panel */
     .prioGrid{
@@ -274,7 +234,7 @@
       margin-top:10px;
     }
     .prioTile{
-      border:1px solid var(--border);
+      border:1px solid rgba(255,255,255,.10);
       border-radius: 14px;
       padding:12px;
       background: rgba(255,255,255,.02);
@@ -282,8 +242,8 @@
     }
     .prioTop{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
     .prioVal{ font-size:22px; font-weight:800; letter-spacing:-0.2px; }
-    .prioKey{ font-size:12px; color: var(--muted); }
-    .prioSub{ margin-top:6px; font-size:12px; color: var(--muted); line-height:1.25; }
+    .prioKey{ font-size:12px; color: rgba(255,255,255,.65); }
+    .prioSub{ margin-top:6px; font-size:12px; color: rgba(255,255,255,.7); line-height:1.25; }
 
     /* Reviews */
     .reviews-head{
@@ -296,7 +256,7 @@
     }
     .review-card{
       padding:12px;
-      border:1px solid var(--border);
+      border:1px solid rgba(255,255,255,.10);
       border-radius: var(--radius2);
       background: rgba(255,255,255,.02);
     }
@@ -308,10 +268,10 @@
     }
     .review-name{ font-weight:700; line-height:1.2; }
     .review-meta{ font-size:12px; color:var(--muted); margin-top:3px; }
-    .review-stars{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--text-strong); white-space:nowrap; }
-    .review-text{ margin-top:10px; font-size:13px; color:var(--text); line-height:1.35; }
+    .review-stars{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:#ffd; white-space:nowrap; }
+    .review-text{ margin-top:10px; font-size:13px; color:#ddd; line-height:1.35; }
     .review-link{ margin-top:10px; font-size:12px; }
-    .review-link a{ color:var(--accent-strong); text-decoration:none; }
+    .review-link a{ color:#7af; text-decoration:none; }
     .review-link a:hover{ text-decoration:underline; }
     .review-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
     .tag{
@@ -320,7 +280,7 @@
       border-radius:999px;
       border:1px solid rgba(255,255,255,.10);
       background: rgba(255,255,255,.02);
-      color: var(--muted);
+      color: rgba(255,255,255,.76);
     }
 
     /* Review Insights / Trend */
@@ -398,7 +358,7 @@
       padding:12px;
     }
     .chart svg{ width:100%; height:160px; display:block; }
-    .links a{ color:var(--accent-strong); text-decoration:none; }
+    .links a{ color:#d6d6ff; text-decoration:none; }
     .links a:hover{ text-decoration:underline; }
     .empty{
       padding:16px;
@@ -413,9 +373,6 @@
     body.view-ops .view-ops{ display:block; }
     body.view-marketing .view-marketing{ display:block; }
     body.view-cx .view-cx{ display:block; }
-    body.view-main .soften-main{ opacity:.7; }
-    body.view-ops .soften-ops{ display:none; }
-    body.view-cx .soften-cx{ display:none; }
 
     .main-dashboard{
       display:grid;
@@ -423,7 +380,7 @@
       gap:14px;
       margin-bottom:16px;
     }
-    .glance ul{ margin:8px 0 0 16px; padding:0; color:var(--text); font-size:13px; line-height:1.45; }
+    .glance ul{ margin:8px 0 0 16px; padding:0; color:rgba(255,255,255,.85); font-size:13px; line-height:1.45; }
     .listCard{ border:1px solid var(--border); border-radius: var(--radius2); padding:12px; background: rgba(255,255,255,.02); }
     .clickable{ cursor:pointer; }
     .compare-grid{ display:grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap:10px; }
@@ -438,10 +395,6 @@
     .debug summary{ cursor:pointer; font-weight:600; }
     .debug-grid{ display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:10px; margin-top:10px; }
     .toggle{ display:flex; align-items:center; gap:8px; font-size:12px; }
-    #compareSelect{ white-space:normal; max-width:360px; }
-    #compareSelect option{ white-space:normal; padding:4px 8px; }
-    #compareChips{ align-items:flex-start; }
-    #compareChips .chip{ white-space:normal; }
 
     @media (max-width: 980px){
       .grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
@@ -456,11 +409,6 @@
 <body>
   <div class="wrap">
     <h1>PB1 Executive Dashboard</h1>
-    <div class="live-row">
-      <span class="live-badge mono" id="liveBadge">LIVE: Apify → Supabase (Chicago) • Stores: —</span>
-    </div>
-    <div class="hint mono" id="scopeMeta">Scope: Chicago, IL • Source: Apify → Supabase</div>
-    <div class="hint mono" id="dataSourceMeta">Data source: LOCAL API • Last updated: —</div>
 
     <div class="subline" id="subline">
       <span class="pill">Loading…</span>
@@ -471,20 +419,7 @@
     <div class="toolbar">
 
       <label class="mono">Week:
-        <input id="weekAllToggle" type="checkbox" checked />
-        <span>All weeks (Latest)</span>
-        <input id="weekDate" type="date" disabled />
-        <button id="weekPrev" class="btn-ghost" type="button">Prev</button>
-        <button id="weekNext" class="btn-ghost" type="button">Next</button>
-        <span class="hint mono" id="weekWindow">Week window: Latest (rolling)</span>
-      </label>
-
-      <label class="mono">State:
-        <input id="stateInput" class="mono" placeholder="Illinois or IL" style="width:140px; text-transform:uppercase;" />
-      </label>
-
-      <label class="mono">City:
-        <input id="cityInput" class="mono" placeholder="Chicago (optional)" style="width:160px;" />
+        <select id="weekSelect"></select>
       </label>
 
       <label class="mono">Shop:
@@ -516,7 +451,6 @@
       <button id="applyBtn" class="btn-primary">Apply</button>
       <button id="reloadBtn" class="btn-ghost">Refresh</button>
       <button id="jsonBtn" class="btn-ghost">Show JSON</button>
-      <span class="hint mono" id="shopsLoaded" style="flex-basis:100%;">—</span>
     </div>
 
 <!-- Store Profile (updates when a store is selected) -->
@@ -538,10 +472,6 @@
   </div>
 </div>
 
-    <div class="card view-section view-main" id="viewHeaderMain" style="margin-top:12px;"></div>
-    <div class="card view-section view-ops view-exec" id="viewHeaderWeekly" style="margin-top:12px;"></div>
-    <div class="card view-section view-cx" id="viewHeaderFeedback" style="margin-top:12px;"></div>
-
     <!-- Main Dashboard -->
     <div id="mainDashboard" class="view-section view-main">
       <div class="main-dashboard">
@@ -558,9 +488,10 @@
           </div>
         </div>
         <div class="card">
-        <div class="section-title">
-          <span>Top / Bottom Shops</span>
-        </div>
+          <div class="section-title">
+            <span>Top / Bottom Shops</span>
+            <span class="hint">Weekly rollup only</span>
+          </div>
           <div class="listCard">
             <div class="kpi-label">Top 3 (highest avg stars)</div>
             <div id="topList" class="mono" style="font-size:12px; line-height:1.4;">—</div>
@@ -572,7 +503,7 @@
         </div>
       </div>
 
-      <div class="card clickable soften-main" id="compareCard">
+      <div class="card clickable" id="compareCard">
         <div class="section-title">
           <span>Compare Shops (2–4)</span>
           <span class="hint">Uses loaded data only</span>
@@ -599,7 +530,6 @@
         <div class="summary" id="execSummary">Loading summary…</div>
         <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <button id="execPrimaryBtn" class="btn-primary">Open Primary Action</button>
-          <button id="evidenceBtn" class="btn-ghost">View Evidence</button>
           <span class="hint" id="execPrimaryLabel">—</span>
         </div>
 
@@ -659,21 +589,18 @@
         <div class="miniGrid">
           <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
             <div class="kpi-label">Action Needed (lowest avg)</div>
-            <div class="mono" id="listWorst" style="font-size:12px; line-height:1.4; color:var(--text);">—</div>
+            <div class="mono" id="listWorst" style="font-size:12px; line-height:1.4; color:rgba(255,255,255,.82);">—</div>
           </div>
           <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
             <div class="kpi-label">Volume Spikes (Δ reviews)</div>
-            <div class="mono" id="listSpikes" style="font-size:12px; line-height:1.4; color:var(--text);">—</div>
+            <div class="mono" id="listSpikes" style="font-size:12px; line-height:1.4; color:rgba(255,255,255,.82);">—</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Key Weekly KPIs -->
-    <div class="section-title view-section view-main view-exec view-ops soften-ops" style="margin-top:6px;">
-      <span>Weekly KPIs</span>
-    </div>
-    <div class="grid view-section view-main view-exec view-ops soften-ops">
+    <div class="grid view-section view-main view-exec view-ops">
       <div class="card clickable" id="kpiCardWeek">
         <div class="kpi-label">Week Ending</div>
         <div class="kpi-value mono" id="kpiWeek">—</div>
@@ -695,6 +622,7 @@
     <div class="view-section view-ops view-exec" id="weeklySection">
       <div class="section-title">
         <span>Weekly Performance (click a row to drill in)</span>
+        <span class="hint mono" id="hint">—</span>
       </div>
 
       <div class="table-wrap">
@@ -765,8 +693,8 @@
 
     <!-- Reviews -->
     <div class="reviews-head view-section view-cx view-marketing view-exec">
-      <div id="reviewsTitle" style="font-weight:700;">Recent Feedback</div>
-      <div id="reviewsMeta" style="font-size:12px; color:var(--muted);"></div>
+      <div style="font-weight:700;">Recent Feedback</div>
+      <div id="reviewsMeta" style="font-size:12px; color:#aaa;"></div>
     </div>
     <div id="reviewsList" class="view-section view-cx view-marketing view-exec" style="display:flex; flex-direction:column; gap:10px;"></div>
 
@@ -819,19 +747,8 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="evidenceModal">
-      <div class="modal">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-          <div style="font-weight:700;">Evidence</div>
-          <button class="btn-ghost" id="evidenceClose">Close</button>
-        </div>
-        <div id="evidenceBody" style="margin-top:10px; font-size:12px; line-height:1.5;"></div>
-      </div>
-    </div>
-
     <div class="debug" style="margin-top:18px;">
-      <button id="debugToggle" class="btn-ghost" style="margin-bottom:8px;">Show Debug</button>
-      <details id="debugDetails">
+      <details>
         <summary>Debug / Provenance</summary>
         <div class="debug-grid">
           <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
@@ -842,16 +759,16 @@
             <div class="kpi-label">Counts</div>
             <div class="mono" id="dbgCounts">—</div>
           </div>
-          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
-            <div class="kpi-label">Filters</div>
-            <div class="mono" id="dbgFilters">—</div>
-          </div>
-          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.02); min-height:auto;">
-            <div class="kpi-label">Last Updated</div>
-            <div class="mono" id="dbgLastUpdated">—</div>
-          </div>
         </div>
         <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:10px;">
+          <label class="toggle"><input type="checkbox" id="toggleChicago" checked /> Chicago-only display</label>
+          <label class="toggle"><input type="checkbox" id="toggleApify" checked /> Google Reviews-only display</label>
+          <label class="toggle">API Base:
+            <select id="apiBaseSelect">
+              <option value="prod">Production</option>
+              <option value="local">Localhost</option>
+            </select>
+          </label>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
           <button id="exportCsvBtn" class="btn-ghost">Export current table CSV</button>
@@ -859,7 +776,7 @@
           <button id="openReviewsJsonBtn" class="btn-ghost">Open reviews JSON</button>
         </div>
         <div class="mono" style="margin-top:10px; font-size:12px;">
-          <div id="dbgUrls">—</div>
+          <div id="dbgEndpoints">—</div>
         </div>
       </details>
     </div>
@@ -933,33 +850,30 @@
     if (el) el.addEventListener(event, handler, opts);
   }
 
-  // Local API base only (no Render endpoints)
-  const API_BASE = "http://localhost:10000/api";
+  // API base must be ORIGIN ONLY (no trailing /api)
+  const PROD_BASE = "https://pb1-t52r.onrender.com";
+  const API_BASE_PREF = localStorage.getItem("pb1_api_base") || "prod";
+  const API_BASE =
+  (location.hostname === "localhost" || location.hostname === "127.0.0.1" || API_BASE_PREF === "local")
+    ? "http://localhost:10000"
+    : PROD_BASE;
 
 
   const DEBUG = false;
-  const log = (...a) => DEBUG && console.log(...a);
   const MIN_STORES = 5;
 
-  const EXEC_URL    = `${API_BASE}/exec-weekly`;
-  const META_URL    = `${API_BASE}/meta`;
-  const STORES_URL  = `${API_BASE}/stores-apify`;
-  const METRICS_URL = `${API_BASE}/metrics`;
-  const REVIEWS_URL = `${API_BASE}/reviews`;
-  const DEBUG_URL   = `${API_BASE}/debug`;
+  function logDebug(...args){
+    if (DEBUG) console.log(...args);
+  }
 
-  const MARKET_STATE_KEY = "pb1_market_state";
-  const MARKET_CITY_KEY = "pb1_market_city";
+  const EXEC_URL    = `${API_BASE}/api/exec-weekly`;
+  const META_URL    = `${API_BASE}/api/meta`;
+  const STORES_URL  = `${API_BASE}/api/stores-apify?limit=500`;
+  const REVIEWS_URL = `${API_BASE}/api/reviews`;
 
     const sublineEl = $("subline");
     const sigEl = $("sig");
-    const weekAllToggle = $("weekAllToggle");
-    const weekDateInput = $("weekDate");
-    const weekPrevBtn = $("weekPrev");
-    const weekNextBtn = $("weekNext");
-    const weekWindowEl = $("weekWindow");
-    const stateInput = $("stateInput");
-    const cityInput = $("cityInput");
+    const weekSelect = $("weekSelect");
     const storeSelect = $("storeSelect");
     const sourceSelect = $("sourceSelect");
     const storeSearch = $("storeSearch");
@@ -968,15 +882,11 @@
     const reloadBtn = $("reloadBtn");
     const jsonBtn = $("jsonBtn");
     const errorBanner = $("errorBanner");
-    const shopsLoadedEl = $("shopsLoaded");
-    const liveBadge = $("liveBadge");
-    const scopeMeta = $("scopeMeta");
     const tbody = $("tbody");
     const emptyState = $("emptyState");
     const reviewsMeta = $("reviewsMeta");
     const reviewsList = $("reviewsList");
-    const reviewsTitle = $("reviewsTitle");
-    const dataSourceMeta = $("dataSourceMeta");
+    const hintEl = $("hint");
     const marketingTrend = $("marketingTrend");
     const marketingHighlights = $("marketingHighlights");
     const marketingFiveStarPct = $("marketingFiveStarPct");
@@ -1003,22 +913,14 @@
     const kpiModalBody = $("kpiModalBody");
     const kpiModalEvidence = $("kpiModalEvidence");
     const kpiModalClose = $("kpiModalClose");
-    const evidenceBtn = $("evidenceBtn");
-    const evidenceModal = $("evidenceModal");
-    const evidenceClose = $("evidenceClose");
-    const evidenceBody = $("evidenceBody");
-    const viewHeaderMain = $("viewHeaderMain");
-    const viewHeaderWeekly = $("viewHeaderWeekly");
-    const viewHeaderFeedback = $("viewHeaderFeedback");
     const drawerWeeklySource = $("drawerWeeklySource");
     const drawerReviewSource = $("drawerReviewSource");
     const dbgApiBase = $("dbgApiBase");
     const dbgCounts = $("dbgCounts");
-    const dbgFilters = $("dbgFilters");
-    const dbgLastUpdated = $("dbgLastUpdated");
-    const dbgUrls = $("dbgUrls");
-    const debugToggle = $("debugToggle");
-    const debugDetails = $("debugDetails");
+    const dbgEndpoints = $("dbgEndpoints");
+    const toggleChicago = $("toggleChicago");
+    const toggleApify = $("toggleApify");
+    const apiBaseSelect = $("apiBaseSelect");
     const exportCsvBtn = $("exportCsvBtn");
     const openExecJsonBtn = $("openExecJsonBtn");
     const openReviewsJsonBtn = $("openReviewsJsonBtn");
@@ -1042,14 +944,14 @@
 
     if (!storeId) {
       spName.textContent = "All shops selected";
-      spAddr.textContent = marketFilterLabel();
+      spAddr.textContent = "Chicago-only display is ON";
       spMeta.textContent = "Select a shop to view details";
       spMaps.disabled = true;
       spCopy.disabled = true;
       return;
     }
 
-    const s = getStoreById(storeId) || (STORES || []).find(x => String(x.id || x.store_id || x.place_id || "") === String(storeId));
+    const s = (STORES_ALL || STORES || []).find(x => (x.id || x.store_id || x.place_id) === storeId);
     if (!s) {
       spName.textContent = "—";
       spAddr.textContent = "—";
@@ -1099,36 +1001,11 @@
 
   function updateDebugPanel(){
     if (dbgApiBase) setText(dbgApiBase, API_BASE);
-    if (dbgCounts) setText(dbgCounts, `shops=${STORES_ALL.length} • weekly=${LAST_EXEC?.records ?? 0} • reviews=${safeNum(LAST_REVIEWS?.records, 0)}`);
-    if (dbgFilters) {
-      const state = MARKET_FILTERS.state || "—";
-      const city = MARKET_FILTERS.city || "—";
-      setText(dbgFilters, `state=${state} • city=${city}`);
+    if (dbgCounts) setText(dbgCounts, `shops=${STORES_ALL.length} • weekly=${LAST_EXEC?.records ?? 0} • reviews=${LAST_REVIEWS?.records ?? 0}`);
+    if (dbgEndpoints) {
+      const shopsUrl = STORES_URL.replace("stores-apify", "stores-google-reviews");
+      setText(dbgEndpoints, `meta=${META_URL} | shops=${shopsUrl} | weekly=${EXEC_URL} | reviews=${REVIEWS_URL}`);
     }
-    if (dbgUrls) {
-      const urls = [
-        LAST_URLS.meta && `meta=${LAST_URLS.meta}`,
-        LAST_URLS.stores && `stores=${LAST_URLS.stores}`,
-        LAST_URLS.metrics && `metrics=${LAST_URLS.metrics}`,
-        LAST_URLS.weekly && `weekly=${LAST_URLS.weekly}`,
-        LAST_URLS.reviews && `reviews=${LAST_URLS.reviews}`,
-        LAST_URLS.debug && `debug=${LAST_URLS.debug}`
-      ].filter(Boolean).join(" | ");
-      setText(dbgUrls, urls || "—");
-    }
-    updateScopeMeta();
-    syncDebugToggle();
-  }
-  function updateDataSourceMeta(lastUpdated){
-    if (!dataSourceMeta) return;
-    const stamp = lastUpdated ? new Date(lastUpdated) : null;
-    const text = stamp ? stamp.toLocaleString() : "—";
-    setText(dataSourceMeta, `Data source: LOCAL API • Last updated: ${text}`);
-  }
-  function updateLiveBadge(count){
-    if (!liveBadge) return;
-    const safeCount = Number.isFinite(count) ? count : 0;
-    setText(liveBadge, `LIVE: Apify → Supabase (Chicago) • Stores: ${fmt(safeCount)}`);
   }
 
 
@@ -1169,22 +1046,12 @@
     let STORES_ALL = [];
     let LAST_EXEC = null;
     let LAST_REVIEWS = null;
-    let LAST_METRICS = null;
     let TABLE_LIMIT = 200;
     let DUPLICATE_IDS_FOUND = false;
-    let APPLY_INFLIGHT = false;
-    let CURRENT_WEEK_LABEL = "Latest (all weeks)";
+    let FILTER_CHICAGO_ONLY = true;
+    let FILTER_APIFY_ONLY = true;
     let TABLE_COMPARE_FILTER = null;
     let STORES_LOGGED = false;
-    let MARKET_FILTERS = { state: null, city: null };
-    let LAST_URLS = {
-      meta: null,
-      stores: null,
-      metrics: null,
-      weekly: null,
-      reviews: null,
-      debug: null
-    };
 
     // Table sorting state
     let sortKey = "avg";
@@ -1215,7 +1082,7 @@
     }
     function setEmptyState(msg){
       showEl(emptyState, "block");
-      setText(emptyState, msg || "No data found for this filter.");
+      setText(emptyState, msg || "No rollup data for this week yet. Try a different week.");
       if (tbody) setHTML(tbody, "");
     }
 
@@ -1238,12 +1105,6 @@
       const t = String(s).trim();
       if (t.length === 2) return t.toUpperCase();
       return t;
-    }
-    function formatStateLabel(s){
-      const t = normalizeState(s);
-      if (!t) return "";
-      if (t.length === 2) return t.toUpperCase();
-      return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
     }
     function isApifySource(s){
       return String(s ?? "").toLowerCase().includes("apify");
@@ -1273,154 +1134,6 @@
       const t = Date.parse(d);
       return Number.isFinite(t) ? new Date(t) : null;
     }
-    function addDaysIso(dateStr, days){
-      const d = new Date(`${dateStr}T00:00:00Z`);
-      if (Number.isNaN(d.getTime())) return "";
-      d.setUTCDate(d.getUTCDate() + days);
-      return d.toISOString().slice(0, 10);
-    }
-    function snapToMetaWeek(dateStr){
-      if (!dateStr) return "";
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      if (!weeks.length) return dateStr;
-      if (weeks.includes(dateStr)) return dateStr;
-      const target = Date.parse(`${dateStr}T00:00:00Z`);
-      if (!Number.isFinite(target)) return "";
-      let candidate = "";
-      for (const w of weeks){
-        const t = Date.parse(`${w}T00:00:00Z`);
-        if (!Number.isFinite(t)) continue;
-        if (t <= target) candidate = w;
-        else break;
-      }
-      return candidate || weeks[0];
-    }
-    function isAllWeeksSelected(){
-      return weekAllToggle ? !!weekAllToggle.checked : true;
-    }
-    function getSelectedWeek(){
-      if (isAllWeeksSelected()) return "";
-      const raw = weekDateInput ? weekDateInput.value : "";
-      return raw ? snapToMetaWeek(raw) : "";
-    }
-    function hasAnyReviews(){
-      return safeNum(LAST_REVIEWS?.records, 0) > 0;
-    }
-    function syncWeekControls(preferredWeek){
-      if (!weekAllToggle || !weekDateInput) return;
-      weekDateInput.disabled = !!weekAllToggle.checked;
-      if (weekPrevBtn) weekPrevBtn.disabled = !!weekAllToggle.checked;
-      if (weekNextBtn) weekNextBtn.disabled = !!weekAllToggle.checked;
-      if (weekAllToggle.checked) {
-        weekDateInput.value = "";
-        return;
-      }
-      const candidate =
-        preferredWeek ||
-        (LAST_EXEC && LAST_EXEC.week_ending) ||
-        (META?.weeks || [])[0] ||
-        "";
-      if (candidate) weekDateInput.value = snapToMetaWeek(candidate);
-    }
-    function updateWeekWindowLabel(){
-      if (!weekWindowEl) return;
-      const selected = getSelectedWeek();
-      if (!selected) {
-        setText(weekWindowEl, "Week window: Latest (rolling)");
-        return;
-      }
-      const end = addDaysIso(selected, 6);
-      setText(weekWindowEl, `Week window: ${selected} \u2192 ${end || "—"}`);
-    }
-    function updateWeekNavButtons(){
-      if (!weekPrevBtn || !weekNextBtn) return;
-      if (isAllWeeksSelected()) {
-        weekPrevBtn.disabled = true;
-        weekNextBtn.disabled = true;
-        return;
-      }
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      weekPrevBtn.disabled = idx <= 0;
-      weekNextBtn.disabled = idx === -1 || idx >= weeks.length - 1;
-    }
-    function normalizeName(s){
-      return String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
-    }
-    function normalizeField(v){
-      return String(v || "").trim().toLowerCase();
-    }
-    function isChicagoOrIllinois(row){
-      const city = normalizeField(row?.city);
-      const state = normalizeField(row?.state);
-      return city === "chicago" || state === "illinois" || state === "il";
-    }
-    function getMarketFiltersFromInputs(){
-      const stateRaw = (stateInput?.value || "").trim();
-      const cityRaw = (cityInput?.value || "").trim();
-      return {
-        state: stateRaw ? stateRaw.toUpperCase() : null,
-        city: cityRaw || null
-      };
-    }
-    function marketFilterLabel(){
-      const state = formatStateLabel(MARKET_FILTERS.state);
-      const city = (MARKET_FILTERS.city || "").trim();
-      if (state || city) {
-        return `Market filter: ${state || "—"}${city ? ` / ${city}` : ""}`;
-      }
-      return "Market filter: none";
-    }
-    function updateScopeMeta(){
-      if (!scopeMeta) return;
-      const city = (MARKET_FILTERS.city || "").trim();
-      const stateLabel = formatStateLabel(MARKET_FILTERS.state);
-      const shortState = stateLabel === "Illinois" ? "IL" : stateLabel;
-      const scope = [city, shortState].filter(Boolean).join(", ") || "All markets";
-      setText(scopeMeta, `Scope: ${scope} • Source: Apify → Supabase`);
-    }
-    function syncDebugToggle(){
-      if (!debugToggle || !debugDetails) return;
-      debugToggle.textContent = debugDetails.open ? "Hide Debug" : "Show Debug";
-    }
-    function setMarketFiltersInInputs(filters){
-      if (stateInput) stateInput.value = (filters?.state || "").toUpperCase();
-      if (cityInput) cityInput.value = filters?.city || "";
-    }
-    function loadMarketFiltersFromStorage(){
-      const state = (localStorage.getItem(MARKET_STATE_KEY) || "").trim().toUpperCase();
-      const city = (localStorage.getItem(MARKET_CITY_KEY) || "").trim();
-      return { state: state || null, city: city || null };
-    }
-    function loadMarketFiltersFromUrl(){
-      const params = new URLSearchParams(window.location.search);
-      const state = (params.get("state") || "").trim().toUpperCase();
-      const city = (params.get("city") || "").trim();
-      return { state: state || null, city: city || null };
-    }
-    function persistMarketFilters(filters){
-      const state = filters?.state || "";
-      const city = filters?.city || "";
-      if (state) localStorage.setItem(MARKET_STATE_KEY, state);
-      else localStorage.removeItem(MARKET_STATE_KEY);
-      if (city) localStorage.setItem(MARKET_CITY_KEY, city);
-      else localStorage.removeItem(MARKET_CITY_KEY);
-
-      const params = new URLSearchParams(window.location.search);
-      if (state) params.set("state", state);
-      else params.delete("state");
-      if (city) params.set("city", city);
-      else params.delete("city");
-      const next = `${location.pathname}${params.toString() ? `?${params}` : ""}`;
-      history.replaceState({}, "", next);
-    }
-    function buildMarketQuery(filters){
-      const qs = new URLSearchParams();
-      if (filters?.state) qs.set("state", filters.state);
-      if (filters?.city) qs.set("city", filters.city);
-      return qs;
-    }
 
    const FETCH_CACHE = new Map();
    const INFLIGHT = new Map();
@@ -1444,15 +1157,8 @@
       );
     }
     INFLIGHT.delete(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     const text = await res.text();
-    if (!res.ok) {
-      let message = text;
-      try {
-        const parsed = JSON.parse(text);
-        message = parsed?.error?.message || parsed?.error || parsed?.message || message;
-      } catch {}
-      throw new Error(`HTTP ${res.status} ${message ? `• ${message}` : ""} (${url})`);
-    }
     if (!text) throw new Error(`Empty JSON response for ${url}`);
     let parsed;
     try {
@@ -1517,20 +1223,14 @@
       }
     }
 
-    // Shop label for /api/stores-apify rows
+    // Shop label for /api/stores rows
     function storeLabel(s){
       if (s?.label) return String(s.label);
       const name = s?.name || s?.store_name || s?.place_name || "Unknown Shop";
-      const address = s?.address || s?.street || "";
       const city = s?.city || "";
       const state = normalizeState(s?.state || "");
-      const parts = [name, address, city, state].filter(Boolean);
+      const parts = [name, city, state].filter(Boolean);
       return parts.join(" • ");
-    }
-    function getStoreById(id){
-      const target = String(id || "");
-      if (!target) return null;
-      return (STORES_ALL || []).find(s => String(s.id || s.store_id || s.place_id || "") === target) || null;
     }
 
     function rowStoreText(row){
@@ -1552,6 +1252,20 @@
       });
     }
 
+    function applyDisplayFilters(list){
+      let out = [...(list || [])];
+      if (FILTER_APIFY_ONLY) {
+        out = out.filter(s => isApifySource(s.source || "apify"));
+      }
+      if (FILTER_CHICAGO_ONLY) {
+        out = out.filter(s => {
+          const city = (s.city || "").toString().toLowerCase();
+          const state = (s.state || "").toString().toLowerCase();
+          return city.includes("chicago") || state.includes("illinois") || state === "il";
+        });
+      }
+      return out;
+    }
 
     function scanDuplicateIds(list){
       const seen = new Set();
@@ -1609,25 +1323,12 @@
     }
 
     async function loadStores(){
-      const qs = buildMarketQuery(MARKET_FILTERS);
-      qs.set("limit", "500");
-      const url = qs.toString() ? `${STORES_URL}?${qs.toString()}` : STORES_URL;
-      LAST_URLS.stores = url;
-      log(`GET ${url}`);
+      const url = STORES_URL;
+      logDebug(`GET ${url}`);
       const json = await fetchJSON(url);
       if (!json.ok) throw new Error(json.error || "shops failed");
       // Load stores from /api/stores-apify
       STORES_ALL = (json.rows || []);
-      const filteredStores = STORES_ALL
-        .filter(isChicagoOrIllinois)
-        .sort((a,b) => {
-          const ak = normalizeField(a.address || a.name);
-          const bk = normalizeField(b.address || b.name);
-          return ak.localeCompare(bk);
-        });
-      STORES_ALL = filteredStores;
-      updateLiveBadge(STORES_ALL.length);
-      console.info("STORES fetch", { url, records: STORES_ALL.length });
       const dupes = scanDuplicateIds(STORES_ALL);
       if (dupes.length) {
         DUPLICATE_IDS_FOUND = true;
@@ -1635,93 +1336,58 @@
         return { clearedStore: false, aborted: true };
       }
 
-      STORES = dedupeStores(STORES_ALL);
+      STORES = dedupeStores(applyDisplayFilters(STORES_ALL));
 
       // IMPORTANT: do NOT restrict to exec rows (it can wipe stores)
       // if (LAST_EXEC?.rows?.length) restrictStoresToExecRows(LAST_EXEC.rows);
 
       // Repopulate dropdown exactly once
       refreshStoreSelect();
-      if (storeSelect) storeSelect.disabled = STORES.length === 0;
 
       if (!STORES_LOGGED && DEBUG) {
-        log(`STORES SOURCE: stores (count: ${STORES_ALL.length})`, STORES_ALL[0]);
+        logDebug(`STORES SOURCE: stores-apify (count: ${STORES_ALL.length})`, STORES_ALL[0]);
         STORES_LOGGED = true;
       }
       renderStoreProfile(storeSelect ? storeSelect.value : "");
       renderCompare();
       updateDebugPanel();
+
       const prev = storeSelect ? storeSelect.value : "";
       if (storeSelect && prev && !STORES.some(s => (s.id || s.store_id) === prev)) {
         storeSelect.value = "";
         return { clearedStore: true };
       }
-      if (shopsLoadedEl) {
-        const label = STORES_ALL.length
-          ? `Shops loaded: ${fmt(STORES_ALL.length)}`
-          : "No data found for this filter.";
-        setText(shopsLoadedEl, label);
-      }
+      setText(hintEl, `Loaded shops: ${fmt(STORES_ALL.length)} • Visible: ${fmt(STORES.length)}`);
       return { clearedStore: false };
     }
 
     async function loadMeta({ preferredWeek } = {}){
-      LAST_URLS.meta = META_URL;
-      log(`GET ${META_URL}`);
+      logDebug(`GET ${META_URL}`);
       const json = await fetchJSON(META_URL);
       if (!json.ok) throw new Error(json.error || "meta failed");
       META = json;
-      updateDataSourceMeta(json.last_updated);
-      console.info("META fetch", { url: META_URL, weeks: (json.weeks || []).length });
 
-      const current = preferredWeek ?? getSelectedWeek();
-      syncWeekControls(current);
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
-      if (sourceSelect) {
-        sourceSelect.innerHTML = "";
-        sourceSelect.disabled = true;
-        sourceSelect.value = "";
+      const weeks = META.weeks || [];
+      const current = preferredWeek ?? (weekSelect ? weekSelect.value : "");
+      populateSelect(weekSelect, weeks, { includeAllLabel: "Latest (all weeks)" });
+      if (weekSelect) {
+        if (current && weeks.includes(current)) weekSelect.value = current;
+        else weekSelect.value = "";
       }
-    }
-
-    async function loadMetrics(){
-      const qs = buildMarketQuery(MARKET_FILTERS);
-      const url = qs.toString() ? `${METRICS_URL}?${qs.toString()}` : METRICS_URL;
-      LAST_URLS.metrics = url;
-      log(`GET ${url}`);
-      const json = await fetchJSON(url);
-      if (!json.ok) throw new Error(json.error || "metrics failed");
-      LAST_METRICS = json;
-      if (dbgLastUpdated) setText(dbgLastUpdated, json.last_updated || "—");
-      updateDataSourceMeta(json.last_updated);
-      console.info("METRICS fetch", { url, stores: json.stores, reviews: json.reviews, weekly: json.exec_weekly_rows });
-      return json;
-    }
-
-    async function loadDebug(){
-      const qs = buildMarketQuery(MARKET_FILTERS);
-     const url = DEBUG_URL;
-      LAST_URLS.debug = url;
-      log(`GET ${url}`);
-      try {
-        const json = await fetchJSON(url);
-        if (json?.ok) {
-          if (dbgLastUpdated) setText(dbgLastUpdated, json.last_updated || "—");
-          if (dbgFilters && json?.meta?.filtersApplied) {
-            const st = json.meta.filtersApplied.state || "—";
-            const ct = json.meta.filtersApplied.city || "—";
-            setText(dbgFilters, `state=${st} • city=${ct}`);
-          }
-          console.info("DEBUG fetch", { url, stores: json.storesCount, weeklyRows: json.execWeeklyRowsCount, reviews: json.reviewsCount });
-        }
-      } catch (e) {
-        console.warn("PB1 debug load failed:", e?.message || e);
+      const sources = (META.sources || []).filter(Boolean);
+      populateSelect(sourceSelect, sources.length ? sources : ["apify"], {
+        labelFn: (s) => displaySourceName(s)
+      });
+      if (sourceSelect) {
+        sourceSelect.value = (sources[0] || "apify");
+        sourceSelect.disabled = sources.length <= 1;
       }
     }
 
     function isValidExecRow(row){
-      return !!row;
+      const source = row?.source;
+      if (source == null || source === "") return true;
+      return isApifySource(source);
     }
 
     async function countExecRowsForWeek(week){
@@ -1729,10 +1395,8 @@
       if (week) qs.set("week", week);
       qs.set("source", "apify");
       qs.set("limit", "2000");
-      if (MARKET_FILTERS.state) qs.set("state", MARKET_FILTERS.state);
       const url = `${EXEC_URL}?${qs.toString()}`;
-      LAST_URLS.weekly = url;
-      log(`validate week: ${url}`);
+      logDebug(`validate week: ${url}`);
       const json = await fetchJSON(url);
       const rows = (json.rows || []).filter(isValidExecRow);
       return rows.length;
@@ -1742,7 +1406,7 @@
       if (!weeks.length) return "";
       for (const week of weeks){
         const count = await countExecRowsForWeek(week);
-        log(`week=${week} rows=${count}`);
+        logDebug(`week=${week} rows=${count}`);
         if (count >= MIN_STORES) return week;
       }
       return weeks[0] || "";
@@ -1750,13 +1414,11 @@
 
     async function ensureDefaultWeek(){
       const weeks = META?.weeks || [];
-      if (!weeks.length || !weekDateInput || isAllWeeksSelected()) return;
-      if (weekDateInput.value && weeks.includes(weekDateInput.value)) return;
+      if (!weeks.length || !weekSelect) return;
+      if (weekSelect.value && weeks.includes(weekSelect.value)) return;
       setLoadingState("Selecting default week…");
       const chosen = await chooseDefaultWeek(weeks);
-      weekDateInput.value = chosen || "";
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
+      weekSelect.value = chosen || "";
     }
 
     function applyStoreSearch(){
@@ -1811,40 +1473,35 @@
 
     async function loadDashboard({ store, week } = {}){
       const storeId = store ?? (storeSelect ? storeSelect.value : "");
-      const weekVal = week ?? getSelectedWeek();
+      const weekVal = week ?? (weekSelect ? weekSelect.value : "");
       const source = currentSource();
-      const state = MARKET_FILTERS.state;
-      const city = MARKET_FILTERS.city;
 
       const qs = new URLSearchParams();
       if (weekVal) qs.set("week", weekVal);
       if (storeId) qs.set("store", storeId);
       if (source) qs.set("source", source);
-      if (state) qs.set("state", state);
-      if (city) qs.set("city", city);
       qs.set("limit", "5000");
 
-      qs.delete("city"); // exec_weekly has no city; prevents 0-row wipeout
       const url = qs.toString() ? `${EXEC_URL}?${qs.toString()}` : EXEC_URL;
 
-      LAST_URLS.weekly = url;
-      log(`GET ${url}`);
+      logDebug(`GET ${url}`);
       const json = await fetchJSON(url);
       if (!json.ok) throw new Error(json.error || "exec-weekly failed");
-      console.info("WEEKLY fetch", { url, records: (json.rows || []).length });
       const apifyRows = (json.rows || []).filter(isValidExecRow); // APIFY_ONLY_LOCK
-      const chicagoRows = apifyRows.filter(isChicagoOrIllinois);
-      const kpiSafe = computeExecKpis(chicagoRows);
-      const execJson = { ...json, rows: chicagoRows, records: chicagoRows.length, kpis: { ...(json.kpis || {}), ...kpiSafe } };
+      const kpiSafe = computeExecKpis(apifyRows);
+      const execJson = { ...json, rows: apifyRows, records: apifyRows.length, kpis: { ...(json.kpis || {}), ...kpiSafe } };
       LAST_EXEC = execJson;
-      updateDataSourceMeta(execJson.last_updated || json.last_updated);
+      const demoOnly = execJson.rows.length && execJson.rows.every(r => /demo/i.test(r.store || r.store_name || r.place_name || ""));
+      if (demoOnly) {
+        showWarning("⚠️ Data appears to be demo/test. Verify backend dataset source.");
+      }
       // do not repopulate store dropdown from exec-weekly
 
       setText(sigEl, `signature: ${execJson.signature || "—"}`);
 
       let viewingLabel = "All shops";
       if (storeId){
-        const selected = getStoreById(storeId);
+        const selected = STORES_ALL.find(s => (s.id || s.store_id || s.place_id) === storeId);
         if (selected) viewingLabel = selected.name || "Selected shop";
       }
 
@@ -1856,9 +1513,7 @@
       });
 
       const k = execJson.kpis || {};
-      const weekLabel = CURRENT_WEEK_LABEL
-        || (isAllWeeksSelected() ? "Latest (all weeks)" : (LAST_EXEC?.week_ending || getSelectedWeek() || "—"));
-      setText($("kpiWeek"), weekLabel);
+      setText($("kpiWeek"), (execJson.week_ending || weekVal || "—"));
       setText($("kpiStores"), fmt(k.stores_reporting ?? 0));
       setText($("kpiReviews"), fmt(k.total_reviews ?? 0));
       setText($("kpiAvgStars"), fmt2(k.avg_stars_overall ?? 0));
@@ -1917,31 +1572,10 @@
       const storesReporting = safeNum(k.stores_reporting, 0);
       const totalReviews = safeNum(k.total_reviews, 0);
       const avgStars = safeNum(k.avg_stars_overall, 0);
-      const reviewRows = (LAST_REVIEWS?.rows || reviewsJson?.rows || []);
+      const reviewRows = reviewsJson?.rows || [];
       const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
       const negCount = rated.filter(x => x <= 2).length;
       const negPct = rated.length ? Math.round((negCount / rated.length) * 100) : 0;
-      const weeklyCount = safeNum(execJson?.records, 0);
-      const reviewCount = safeNum(LAST_REVIEWS?.records, 0);
-      const storeSelected = !!(storeSelect && storeSelect.value);
-
-      if (storeSelected && (weeklyCount === 0 || reviewCount === 0)) {
-        const msg = "No data matched this shop. This may indicate store_id mismatch between endpoints.";
-        setHTML(glanceList, `<li>${escapeHtml(msg)}</li>`);
-        setText(glanceStamp, new Date().toLocaleTimeString());
-        setHTML(topList, msg);
-        setHTML(bottomList, msg);
-        return;
-      }
-
-      if (weeklyCount < 3) {
-        const msg = "Not enough data for ranking. Need ≥ 3 shops reporting for this week/scope.";
-        setHTML(glanceList, `<li>${escapeHtml(msg)}</li>`);
-        setText(glanceStamp, new Date().toLocaleTimeString());
-        setHTML(topList, msg);
-        setHTML(bottomList, msg);
-        return;
-      }
 
       const sortedByAvg = [...rows].sort((a,b) => a.avg - b.avg);
       const worst = sortedByAvg[0];
@@ -1995,7 +1629,7 @@
     function openKpiModal(type){
       if (!kpiModal || !kpiModalBody || !kpiModalTitle) return;
       const k = LAST_EXEC?.kpis || {};
-      const weekText = CURRENT_WEEK_LABEL || LAST_EXEC?.week_ending || "—";
+      const weekText = LAST_EXEC?.week_ending || "—";
       const total = fmt(k.total_reviews ?? 0);
       const stores = fmt(k.stores_reporting ?? 0);
       const avg = fmt2(k.avg_stars_overall ?? 0);
@@ -2025,9 +1659,9 @@
           <tbody>
             ${tableRows.map(r => `
               <tr>
-                <td style="padding:6px; border-bottom:1px solid var(--border);">${escapeHtml(r.store || "—")}</td>
-                <td style="padding:6px; text-align:right; border-bottom:1px solid var(--border);">${fmt2(r.avg)}</td>
-                <td style="padding:6px; text-align:right; border-bottom:1px solid var(--border);">${fmt(r.total)}</td>
+                <td style="padding:6px; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(r.store || "—")}</td>
+                <td style="padding:6px; text-align:right; border-bottom:1px solid rgba(255,255,255,.06);">${fmt2(r.avg)}</td>
+                <td style="padding:6px; text-align:right; border-bottom:1px solid rgba(255,255,255,.06);">${fmt(r.total)}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -2062,11 +1696,7 @@
     function reviewNegPctForStore(store){
       if (!store || !LAST_REVIEWS?.rows) return null;
       const sid = store.id || store.place_id || store.store_id || "";
-      let rows = (LAST_REVIEWS.rows || []).filter(r => String(r.storeId || r.store_id || "") === String(sid));
-      if (!rows.length) {
-        const target = normalizeName(store.name || "");
-        rows = (LAST_REVIEWS.rows || []).filter(r => normalizeName(r.storeName || r.store_name || "") === target);
-      }
+      const rows = (LAST_REVIEWS.rows || []).filter(r => (r.store_id || "") === sid);
       const ratings = rows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
       if (!ratings.length) return null;
       const neg = ratings.filter(x => x <= 2).length;
@@ -2127,7 +1757,7 @@
     function renderTable(rows){
       if (tbody) setHTML(tbody, "");
 
-      const week = getSelectedWeek();
+      const week = weekSelect ? weekSelect.value : "";
       let filtered = rows.map(normalizeRow);
 
       if (week){
@@ -2371,18 +2001,16 @@
         if (source) qs.set("source", source);
 
         const url = `${REVIEWS_URL}?${qs.toString()}`;
-        log(`GET ${url}`);
+        logDebug(`GET ${url}`);
         const json = await fetchJSON(url);
 
         if (!json.ok){
           if (drawerReviews) setHTML(drawerReviews, `<div class="empty">Failed to load: ${escapeHtml(json.error || "Unknown error")}</div>`);
         } else {
-          const rows = (json.rows || []);
+          // APIFY_ONLY_LOCK
+          const rows = (json.rows || []).filter(r => isApifySource(r.source));
           if (!rows.length){
-            const msg = hasAnyReviews()
-              ? "No matching entries for this shop filter."
-              : "No reviews found for current market filter.";
-            if (drawerReviews) setHTML(drawerReviews, `<div class="empty">${escapeHtml(msg)}</div>`);
+            if (drawerReviews) setHTML(drawerReviews, `<div class="empty">No reviews found for this shop/source filter.</div>`);
           } else {
             if (drawerReviews) setHTML(drawerReviews, rows.map(r => {
               const date = r.review_date ? escapeHtml(r.review_date) : "";
@@ -2399,7 +2027,7 @@
                     </div>
                     <div class="review-stars">${stars(r.rating)}</div>
                   </div>
-                  <div class="review-text">${txt || "<span style='color:var(--muted);'>No text</span>"}</div>
+                  <div class="review-text">${txt || "<span style='color:#666;'>No text</span>"}</div>
                   ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
                 </div>
               `;
@@ -2449,24 +2077,6 @@
       setText(prioNegSub, ratings.length ? `${negCount} negatives out of ${ratings.length} rated` : "no rated reviews");
 
       drawTrendCanvas(rows);
-    }
-    function normalizeReviewRow(r){
-      const reviewId = r.id ?? r.review_id ?? r.uid ?? null;
-      const storeId = r.store_id ?? r.shop_id ?? r.place_id ?? null;
-      const storeName = r.store_name ?? r.shop_name ?? r.location_name ?? "";
-      const rating = safeNum(r.rating ?? r.stars ?? r.score, 0);
-      const dateRaw = r.review_date ?? r.date ?? r.publishedAt ?? r.created_at ?? r.time ?? null;
-      const text = r.review_text ?? r.text ?? r.content ?? "";
-      return {
-        ...r,
-        reviewId,
-        storeId,
-        storeName,
-        rating,
-        review_date: dateRaw,
-        review_text: text,
-        sourceName: displaySourceName(r.source)
-      };
     }
 
     function drawTrendCanvas(rows){
@@ -2640,15 +2250,7 @@
     function renderPlatformBars(mix){
       if (platformBarsEl) setHTML(platformBarsEl, "");
       if (!mix.length){
-        const reviewCount = safeNum(LAST_REVIEWS?.records, 0);
-        if (platformBarsEl) {
-          setHTML(
-            platformBarsEl,
-            reviewCount > 0
-              ? `<div class="empty">Feedback sample: ${fmt(reviewCount)} reviews</div>`
-              : ""
-          );
-        }
+        if (platformBarsEl) setHTML(platformBarsEl, `<div class="empty">No reviews loaded yet.</div>`);
         return;
       }
       const total = mix.reduce((a,b)=>a+b.v,0) || 1;
@@ -2675,8 +2277,7 @@
       const total = safeNum(k.total_reviews, 0);
       const avgStars = safeNum(k.avg_stars_overall, 0);
 
-      const reviewRows = (LAST_REVIEWS?.rows || reviewsJson?.rows || []);
-      const reviewCount = safeNum(LAST_REVIEWS?.records ?? reviewsJson?.records ?? 0, 0);
+      const reviewRows = reviewsJson?.rows || [];
       const ratings = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
       const avgReview = ratings.length ? (ratings.reduce((a,b)=>a+b,0) / ratings.length) : 0;
       const negCount = ratings.filter(x => x <= 2).length;
@@ -2685,10 +2286,10 @@
       const worst = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.avg - b.avg)[0];
       const drop = (execJson?.rows || []).map(normalizeRow).sort((a,b)=>a.dStars - b.dStars)[0];
 
-      const weekText = CURRENT_WEEK_LABEL || "Latest (all weeks)";
+      const weekText = execJson?.week_ending || ((weekSelect && weekSelect.value) || "latest");
       const platformText = displaySourceName(currentSource());
       const storeText = (storeSelect && storeSelect.value)
-        ? (getStoreById(storeSelect.value)?.name || "selected shop")
+        ? (STORES_ALL.find(s => (s.id || s.store_id || s.place_id) === storeSelect.value)?.name || "selected shop")
         : "all shops";
 
       const status = avgStars >= 4.2 && negPct < 10 ? "Healthy" : (avgStars >= 3.8 ? "Watch" : "Critical");
@@ -2697,16 +2298,10 @@
       lines.push(`Status: ${status} • Week: ${weekText}`);
       lines.push(`Scope: ${storeText} • ${platformText}`);
       lines.push(`Key metrics: ${fmt(stores)} shops reporting • ${fmt(total)} reviews • avg ${fmt2(avgStars)}★`);
-      if (reviewCount > 0){
-        lines.push(`Feedback sample: ${fmt(reviewCount)} reviews`);
-      }
       if (ratings.length){
         lines.push(`Customer signals: ${fmt(ratings.length)} rated reviews • avg ${fmt2(avgReview)}★ • negative ${negPct.toFixed(0)}% (≤2★)`);
-      }
-      const fallbackUsed = !!execJson?.meta?.fallbackUsed;
-      const execRowCount = (execJson?.rows || []).length;
-      if (fallbackUsed){
-        lines.push(execRowCount ? "Data note: Derived from latest available reviews" : "No weekly rollup found for this market/week");
+      } else {
+        lines.push(`Customer signals: no rated reviews returned for current filters.`);
       }
 
       setText(execSummaryEl, lines.join("\n"));
@@ -2720,10 +2315,6 @@
         execPrimaryBtn.onclick = () => {
           if (primary) selectStoreFromRow(primary.raw);
         };
-      }
-
-      if (evidenceBtn) {
-        evidenceBtn.disabled = false;
       }
 
       // badges
@@ -2747,173 +2338,100 @@
       renderPlatformBars(mix);
     }
 
-    function updateViewHeaders(){
-      const k = LAST_EXEC?.kpis || {};
-      const stores = safeNum(k.stores_reporting, 0);
-      const totalReviews = safeNum(k.total_reviews, 0);
-      const avgStars = safeNum(k.avg_stars_overall, 0);
-      const reviewRows = LAST_REVIEWS?.rows || [];
-      const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
-      const avgReview = rated.length ? (rated.reduce((a,b)=>a+b,0) / rated.length) : 0;
-      const weekLabel = CURRENT_WEEK_LABEL || "Latest (all weeks)";
-      if (viewHeaderMain) {
-        setHTML(viewHeaderMain, `<strong>Executive Overview</strong> • ${weekLabel} • shops ${fmt(stores)} • reviews ${fmt(totalReviews)} • avg ${fmt2(avgStars)}★`);
-      }
-      if (viewHeaderWeekly) {
-        setHTML(viewHeaderWeekly, `<strong>Weekly Summary</strong> • ${weekLabel} • records ${fmt(LAST_EXEC?.records ?? 0)} • shops ${fmt(stores)} • avg ${fmt2(avgStars)}★`);
-      }
-      if (viewHeaderFeedback) {
-        setHTML(viewHeaderFeedback, `<strong>Feedback Summary</strong> • ${weekLabel} • reviews ${fmt(LAST_REVIEWS?.records ?? 0)} • rated ${fmt(rated.length)} • avg ${fmt2(avgReview)}★`);
-      }
-    }
-
     async function loadReviews(){
-      try{
-        const store_id = storeSelect ? String(storeSelect.value || "").trim() : "";
-        const source = currentSource();
+      const store_id = storeSelect ? storeSelect.value : "";
+      const source = currentSource();
 
-        const stateVal = (stateInput?.value || MARKET_FILTERS.state || "").toString().trim();
-        const cityVal  = (cityInput?.value  || MARKET_FILTERS.city  || "").toString().trim();
+      const qs = new URLSearchParams();
+      qs.set("limit", "60");
+      if (store_id) qs.set("store_id", store_id);
+      if (source) qs.set("source", source);
 
-        const qs = new URLSearchParams();
-        qs.set("limit","60");
-        if (store_id) qs.set("store_id", store_id);
-        if (source) qs.set("source", source);
-        if (stateVal) qs.set("state", stateVal);
-        if (cityVal) qs.set("city", cityVal);
+      const url = `${REVIEWS_URL}?${qs.toString()}`;
+      logDebug(`GET ${url}`);
 
-        const url = `${REVIEWS_URL}?${qs.toString()}`;
-        LAST_URLS = LAST_URLS || {};
-        LAST_URLS.reviews = url;
-
-        const json = await fetchJSON(url);
-
-        const normalizedRows = (json?.rows || []).map(r => ({
-          store_id: String(r.store_id ?? r.storeId ?? r.store_id_resolved_to ?? "") || null,
-          state: (r.state || "").toString(),
-          city: (r.city || "").toString(),
-          rating: safeNum(r.rating ?? r.stars ?? r.score, 0),
-          review_text: r.review_text ?? r.text ?? r.content ?? null,
-          reviewer_name: r.reviewer_name ?? r.reviewerName ?? null,
-          review_date: r.review_date ?? r.date ?? r.publishedAt ?? r.created_at ?? r.time ?? null,
-          url: r.url ?? r.review_url ?? r.reviewUrl ?? null
-        }));
-
-        const marketState = normalizeField(stateVal || "");
-        const marketCity  = normalizeField(cityVal  || "");
-
-        const marketRows = (marketState || marketCity)
-          ? normalizedRows.filter(r => {
-              const rs = normalizeField(r.state);
-              const rc = normalizeField(r.city);
-              const stateOk =
-                !marketState ||
-                rs === marketState ||
-                (marketState === "il" && rs === "illinois") ||
-                (marketState === "illinois" && rs === "il");
-              const cityOk = !marketCity || rc === marketCity;
-              return stateOk && cityOk;
-            })
-          : normalizedRows;
-
-        const storeRows = store_id
-          ? marketRows.filter(r => String(r.store_id || "") === store_id)
-          : marketRows;
-
-        const reviewsJson = { ...json, rows: storeRows, records: storeRows.length };
-        LAST_REVIEWS = reviewsJson;
-
-        console.info("REVIEWS fetch", { url, records: reviewsJson.records });
-
-        if (!json?.ok){
-          setText(reviewsMeta, "Failed to load reviews");
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(json?.error || "Unknown error")}</div>`);
-          updateReviewInsights([], "—");
-          updateDebugPanel();
-          return null;
-        }
-
-        const selectedStore = store_id ? getStoreById(store_id) : null;
-        const storeLabelText = selectedStore?.name || (store_id ? "Selected shop" : "All shops");
-        const filtered = storeRows;
-
-        const sorted = filtered.slice().sort((a,b) => {
-          const da = parseDateSafe(a.review_date)?.getTime() || 0;
-          const db = parseDateSafe(b.review_date)?.getTime() || 0;
-          return db - da;
-        });
-        const displayRows = sorted.slice(0, 18);
-
-        const plat = source ? displaySourceName(source) : "All sources";
-        if (reviewsTitle) {
-          setText(reviewsTitle, store_id ? `Feedback for: ${storeLabelText}` : "Feedback: All shops");
-        }
-        const countText = filtered.length
-          ? `Showing ${fmt(displayRows.length)} of ${fmt(filtered.length)} reviews`
-          : "";
-        setText(reviewsMeta, countText ? `${storeLabelText} • ${plat} • ${countText}` : `${storeLabelText} • ${plat}`);
-
-        updateReviewInsights(sorted, storeLabelText);
-        updateMarketingCx(sorted);
-
-        if (!filtered.length){
-          const msg = hasAnyReviews()
-            ? (store_id ? "No matching entries for this shop filter." : "No matching entries for this filter.")
-            : "No reviews found for current market filter.";
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(msg)}</div>`);
-          updateDebugPanel();
-          return reviewsJson;
-        }
-
-        if (reviewsList) setHTML(reviewsList, displayRows.map(r => {
-          const date = r.review_date ? escapeHtml(r.review_date) : "";
-          const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
-          const txt = r.review_text ? escapeHtml(r.review_text) : "";
-          const link = r.url ? escapeHtml(r.url) : "";
-          const rating = safeNum(r.rating, 0);
-          const ratingText = Number.isFinite(rating) && rating > 0 ? rating : null;
-
-          const tags = [];
-          if (ratingText) tags.push(`<span class="tag mono">${ratingText.toFixed(0)}★</span>`);
-          if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
-
-          return `
-            <div class="review-card">
-              <div class="review-top">
-                <div>
-                  <div class="review-name">${who}</div>
-                  <div class="review-meta">${date}</div>
-                </div>
-                <div class="review-stars">${ratingText ? stars(ratingText) : "—"}</div>
-              </div>
-
-              <div class="review-tags">${tags.join("")}</div>
-              <div class="review-text">${txt || "<span style='color:var(--muted);'>No text</span>"}</div>
-              ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
-            </div>
-          `;
-        }).join(""));
-
-        updateDebugPanel();
-        return reviewsJson;
-      } catch(e){
-        showError(`Reviews failed: ${String(e.message || e)}`);
-        return null;
+      const json = await fetchJSON(url);
+      let rows = (json.rows || []);
+      let relaxed = false;
+      if (!rows.length && source) {
+        const relaxedUrl = `${REVIEWS_URL}?limit=60${store_id ? `&store_id=${encodeURIComponent(store_id)}` : ""}`;
+        try {
+          const relaxed = await fetchJSON(relaxedUrl);
+          if (relaxed?.rows?.length) {
+            rows = relaxed.rows;
+            showWarning("Source filter relaxed (no Google Reviews rows detected).");
+            relaxed = true;
+          }
+        } catch {}
       }
+      // APIFY_ONLY_LOCK (display)
+      rows = (!relaxed && FILTER_APIFY_ONLY) ? rows.filter(r => isApifySource(r.source)) : rows;
+      const reviewsJson = { ...json, rows, records: rows.length };
+      LAST_REVIEWS = reviewsJson;
+
+      if (!json.ok){
+        setText(reviewsMeta, "Failed to load reviews");
+        if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(json.error || "Unknown error")}</div>`);
+        updateReviewInsights([], "—");
+        showError(`Reviews failed: ${json.error || "Unknown error"}`);
+        return;
+      }
+
+      const storeLabelText = store_id
+        ? (STORES_ALL.find(s => (s.id || s.store_id || s.place_id) === store_id)?.name || "Selected shop")
+        : "All shops";
+
+      const plat = source ? displaySourceName(source) : "All sources";
+      setText(reviewsMeta, `${storeLabelText} • ${plat} • Reviews: ${fmt(reviewsJson.records)} • Limit ${reviewsJson.filters?.limit ?? ""}`);
+
+      updateReviewInsights(rows, storeLabelText);
+      updateMarketingCx(rows);
+
+      // executive summary uses BOTH exec+reviews
+      if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, reviewsJson);
+
+      if (!rows.length){
+        if (reviewsList) setHTML(reviewsList, `<div class="empty">No reviews found for this filter.</div>`);
+        return;
+      }
+
+      if (reviewsList) setHTML(reviewsList, rows.slice(0, 18).map(r => {
+        const date = r.review_date ? escapeHtml(r.review_date) : "";
+        const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
+              const src = r.source ? escapeHtml(displaySourceName(r.source)) : "";
+        const txt = r.review_text ? escapeHtml(r.review_text) : "";
+        const link = r.url ? escapeHtml(r.url) : "";
+        const rating = safeNum(r.rating ?? r.stars, 0);
+
+        const tags = [];
+        if (src) tags.push(`<span class="tag mono">${escapeHtml(displaySourceName(src))}</span>`);
+        if (rating) tags.push(`<span class="tag mono">${rating.toFixed(0)}★</span>`);
+        if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
+
+        return `
+          <div class="review-card">
+            <div class="review-top">
+              <div>
+                <div class="review-name">${who}</div>
+                <div class="review-meta">${date}${src ? ` • <span style="color:#8ad;">${src}</span>` : ""}</div>
+              </div>
+              <div class="review-stars">${stars(rating)}</div>
+            </div>
+
+            <div class="review-tags">${tags.join("")}</div>
+            <div class="review-text">${txt || "<span style='color:#666;'>No text</span>"}</div>
+            ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
+          </div>
+        `;
+      }).join(""));
     }
-
-
 
     async function runApply(){
       try{
-        if (APPLY_INFLIGHT) return;
-        APPLY_INFLIGHT = true;
         clearError();
         setLoadingState("Loading weekly data…");
-        const week = getSelectedWeek();
+        const week = weekSelect ? weekSelect.value : "";
         const store = storeSelect ? storeSelect.value : "";
-        await loadMeta({ preferredWeek: week });
-        await ensureDefaultWeek();
         const storeUpdate = await loadStores();
         if (storeUpdate?.aborted) return;
         if (storeUpdate?.clearedStore) {
@@ -2921,25 +2439,11 @@
         } else {
           await loadDashboard({ store, week });
         }
-        await loadMetrics();
-        const reviewsJson = await loadReviews();
-        const selectedWeek = getSelectedWeek();
-        CURRENT_WEEK_LABEL = selectedWeek
-          ? (LAST_EXEC?.week_ending || selectedWeek)
-          : "Latest (all weeks)";
-        setText($("kpiWeek"), CURRENT_WEEK_LABEL || "Latest (all weeks)");
-        updateWeekWindowLabel();
-        updateWeekNavButtons();
-        console.info("APPLY complete", { week: getSelectedWeek(), state: MARKET_FILTERS.state, city: MARKET_FILTERS.city, weekly: LAST_EXEC?.records, reviews: LAST_REVIEWS?.records });
-        await loadDebug();
-        if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, reviewsJson || LAST_REVIEWS);
+        await loadReviews();
         renderMainDashboard(LAST_EXEC, LAST_REVIEWS);
-        updateViewHeaders();
         updateDebugPanel();
       }catch(e){
         showError(String(e.message || e));
-      } finally {
-        APPLY_INFLIGHT = false;
       }
     }
 
@@ -2947,6 +2451,8 @@
     addListener(reloadBtn, "click", async () => {
       try{
         clearError();
+        await loadMeta({ preferredWeek: weekSelect ? weekSelect.value : "" });
+        await ensureDefaultWeek();
         await runApply();
       }catch(e){
         showError(String(e.message || e));
@@ -2999,12 +2505,6 @@
       }
       renderCompare();
     });
-    addListener(debugToggle, "click", () => {
-      if (!debugDetails) return;
-      debugDetails.open = !debugDetails.open;
-      syncDebugToggle();
-    });
-    addListener(debugDetails, "toggle", syncDebugToggle);
 
     addListener(loadMoreBtn, "click", () => {
       TABLE_LIMIT += 200;
@@ -3016,6 +2516,25 @@
     addListener($("kpiCardReviews"), "click", () => openKpiModal("reviews"));
     addListener($("kpiCardAvgStars"), "click", () => openKpiModal("avg"));
 
+    addListener(toggleChicago, "change", () => {
+      FILTER_CHICAGO_ONLY = !!toggleChicago?.checked;
+      localStorage.setItem("pb1_filter_chicago", String(FILTER_CHICAGO_ONLY));
+      STORES = dedupeStores(applyDisplayFilters(STORES_ALL));
+      refreshStoreSelect();
+      renderStoreProfile(storeSelect ? storeSelect.value : "");
+    });
+    addListener(toggleApify, "change", () => {
+      FILTER_APIFY_ONLY = !!toggleApify?.checked;
+      localStorage.setItem("pb1_filter_apify", String(FILTER_APIFY_ONLY));
+      STORES = dedupeStores(applyDisplayFilters(STORES_ALL));
+      refreshStoreSelect();
+      renderStoreProfile(storeSelect ? storeSelect.value : "");
+    });
+    addListener(apiBaseSelect, "change", () => {
+      const v = apiBaseSelect?.value || "prod";
+      localStorage.setItem("pb1_api_base", v);
+      location.reload();
+    });
     addListener(themeSelect, "change", () => {
       const v = themeSelect?.value || "dark";
       document.body.setAttribute("data-theme", v);
@@ -3029,75 +2548,16 @@
       w.document.write(`<pre style="white-space:pre-wrap;font-family:ui-monospace">${pretty.replaceAll("<","&lt;")}</pre>`);
       w.document.close();
     });
-    addListener(evidenceBtn, "click", () => {
-      if (!evidenceModal || !evidenceBody) return;
-      const storeId = storeSelect ? storeSelect.value : "";
-      const storeLabelText = storeId ? (getStoreById(storeId)?.name || "Selected shop") : "All shops";
-      const weeklyUrl = LAST_URLS?.weekly || "—";
-      const reviewsUrl = LAST_URLS?.reviews || "—";
-      setHTML(evidenceBody, `
-        <div><strong>Store</strong>: ${escapeHtml(storeLabelText)}${storeId ? ` (${escapeHtml(storeId)})` : ""}</div>
-        <div><strong>exec-weekly URL</strong>: <span class="mono">${escapeHtml(weeklyUrl)}</span></div>
-        <div><strong>reviews URL</strong>: <span class="mono">${escapeHtml(reviewsUrl)}</span></div>
-      `);
-      showEl(evidenceModal, "flex");
-    });
-    addListener(evidenceClose, "click", () => hideEl(evidenceModal));
-    addListener(evidenceModal, "click", (e) => {
-      if (e.target === evidenceModal) hideEl(evidenceModal);
-    });
 
     // Auto-apply changes
-    const debouncedWeekApply = debounce(() => runApply(), 300);
-    addListener(weekAllToggle, "change", () => {
-      syncWeekControls();
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
-      debouncedWeekApply();
-    });
-    addListener(weekDateInput, "change", () => {
-      if (!weekDateInput) return;
-      const snapped = snapToMetaWeek(weekDateInput.value);
-      if (snapped) weekDateInput.value = snapped;
-      updateWeekNavButtons();
-      updateWeekWindowLabel();
-      debouncedWeekApply();
-    });
-    addListener(weekPrevBtn, "click", () => {
-      if (!weekDateInput) return;
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      if (idx > 0) {
-        weekDateInput.value = weeks[idx - 1];
-        updateWeekNavButtons();
-        updateWeekWindowLabel();
-        debouncedWeekApply();
-      }
-    });
-    addListener(weekNextBtn, "click", () => {
-      if (!weekDateInput) return;
-      const weeks = (META?.weeks || []).filter(Boolean).slice().sort();
-      const current = getSelectedWeek();
-      const idx = weeks.indexOf(current);
-      if (idx > -1 && idx < weeks.length - 1) {
-        weekDateInput.value = weeks[idx + 1];
-        updateWeekNavButtons();
-        updateWeekWindowLabel();
-        debouncedWeekApply();
-      }
-    });
+    addListener(weekSelect, "change", runApply);
     addListener(storeSelect, "change", async () => {
       renderStoreProfile(storeSelect ? storeSelect.value : "");
       await runApply();
     });
     addListener(sourceSelect, "change", runApply);
     addListener(storeSearch, "input", debounce(applyStoreSearch, 200));
-    addListener(applyBtn, "click", async () => {
-      MARKET_FILTERS = getMarketFiltersFromInputs();
-      persistMarketFilters(MARKET_FILTERS);
-      await runApply();
-    });
+    addListener(applyBtn, "click", runApply);
 
     // Sorting handlers
     document.querySelectorAll("thead th.sortable").forEach(th => {
@@ -3119,16 +2579,17 @@
     (async function init(){
       try{
         setView("main");
-        const urlFilters = loadMarketFiltersFromUrl();
-        const storedFilters = loadMarketFiltersFromStorage();
-        MARKET_FILTERS = {
-          state: urlFilters.state ?? storedFilters.state ?? "Illinois",
-          city: urlFilters.city ?? storedFilters.city ?? "Chicago"
-        };
-        setMarketFiltersInInputs(MARKET_FILTERS);
-        syncWeekControls();
-        updateScopeMeta();
-        syncDebugToggle();
+        if (toggleChicago) {
+          const val = localStorage.getItem("pb1_filter_chicago");
+          FILTER_CHICAGO_ONLY = val == null ? true : val === "true";
+          toggleChicago.checked = FILTER_CHICAGO_ONLY;
+        }
+        if (toggleApify) {
+          const val = localStorage.getItem("pb1_filter_apify");
+          FILTER_APIFY_ONLY = val == null ? true : val === "true";
+          toggleApify.checked = FILTER_APIFY_ONLY;
+        }
+        if (apiBaseSelect) apiBaseSelect.value = (API_BASE_PREF === "local") ? "local" : "prod";
         if (themeSelect) {
           const theme = localStorage.getItem("pb1_theme") || "dark";
           themeSelect.value = theme;
@@ -3136,16 +2597,13 @@
         }
         clearError();
         setLoadingState("Loading metadata…");
+        await loadMeta();
+        await ensureDefaultWeek();
         await runApply();
       }catch(e){
         console.error(e);
         showError(String(e.message || e));
-        setSubline({
-          ok: false,
-          last_updated: new Date().toISOString(),
-          records: LAST_EXEC?.records ?? 0,
-          viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
-        });
+        if (sublineEl) setHTML(sublineEl, `<span class="pill">Data Error</span><span class="pill mono">${escapeHtml(String(e.message || e))}</span>`);
       }
     })();
   </script>
