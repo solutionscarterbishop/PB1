@@ -404,6 +404,26 @@
       padding:16px;
       color:var(--muted);
       font-size:13px;
+      border-radius: 12px;
+    }
+    .empty--loading{
+      background: rgba(255,255,255,.02);
+    }
+    .empty--loading .empty-icon{
+      display: inline-block;
+      animation: spin 1.5s linear infinite;
+    }
+    .empty--no-data{
+      background: rgba(255,255,255,.02);
+    }
+    .empty--error{
+      background: rgba(255,80,80,.06);
+      border: 1px solid rgba(255,80,80,.2);
+      color: #ffd7d7;
+    }
+    @keyframes spin{
+      from{ transform:rotate(0deg); }
+      to{ transform:rotate(360deg); }
     }
     .drawerReviews{ display:flex; flex-direction:column; gap:10px; }
 
@@ -457,9 +477,9 @@
   <div class="wrap">
     <h1>PB1 Executive Dashboard</h1>
     <div class="live-row">
-      <span class="live-badge mono" id="liveBadge">LIVE: Apify → Supabase (Chicago) • Stores: —</span>
+      <span class="live-badge mono" id="liveBadge">LIVE: Apify → Supabase • Stores: —</span>
     </div>
-    <div class="hint mono" id="scopeMeta">Scope: Chicago, IL • Source: Apify → Supabase</div>
+    <div class="hint mono" id="scopeMeta">Scope: All Markets • Source: Apify → Supabase</div>
     <div class="hint mono" id="dataSourceMeta">Data source: LOCAL API • Last updated: —</div>
 
     <div class="subline" id="subline">
@@ -941,20 +961,20 @@
     if (el) el.addEventListener(event, handler, opts);
   }
 
-  // Local API base only (no Render endpoints)
-  const API_BASE = "http://localhost:10000/api";
+const API_BASE = "http://localhost:10000/api";
 
+// Read API token (set window.PB1_READ_TOKEN before page load if auth required)
+const READ_TOKEN = window.PB1_READ_TOKEN || "";
 
   const DEBUG = false;
   const log = (...a) => DEBUG && console.log(...a);
   const MIN_STORES = 5;
 
-  const EXEC_URL    = `${API_BASE}/exec-weekly`;
-  const META_URL    = `${API_BASE}/meta`;
-  const STORES_URL  = `${API_BASE}/stores-apify`;
-  const METRICS_URL = `${API_BASE}/metrics`;
-  const REVIEWS_URL = `${API_BASE}/reviews`;
-  const DEBUG_URL   = `${API_BASE}/debug`;
+const EXEC_URL    = `${API_BASE}/api/exec-weekly`;
+const META_URL    = `${API_BASE}/api/meta`;
+const STORES_URL  = `${API_BASE}/api/stores-apify`;
+const REVIEWS_URL = `${API_BASE}/api/reviews`;
+  
 
   const MARKET_STATE_KEY = "pb1_market_state";
   const MARKET_CITY_KEY = "pb1_market_city";
@@ -1117,20 +1137,20 @@
       const city = MARKET_FILTERS.city || "—";
       setText(dbgFilters, `state=${state} • city=${city}`);
     }
-    if (dbgUrls) {
-      const urls = [
-        LAST_URLS.meta && `meta=${LAST_URLS.meta}`,
-        LAST_URLS.stores && `stores=${LAST_URLS.stores}`,
-        LAST_URLS.metrics && `metrics=${LAST_URLS.metrics}`,
-        LAST_URLS.weekly && `weekly=${LAST_URLS.weekly}`,
-        LAST_URLS.reviews && `reviews=${LAST_URLS.reviews}`,
-        LAST_URLS.debug && `debug=${LAST_URLS.debug}`
-      ].filter(Boolean).join(" | ");
-      setText(dbgUrls, urls || "—");
-    }
-    updateScopeMeta();
-    syncDebugToggle();
-  }
+   if (dbgUrls) {
+  const U = (typeof LAST_URLS === "object" && LAST_URLS) ? LAST_URLS : {};
+  const urls = [
+    U.meta    ? `meta=${U.meta}`       : null,
+    U.stores  ? `stores=${U.stores}`   : null,
+    U.metrics ? `metrics=${U.metrics}` : null,
+    U.weekly  ? `weekly=${U.weekly}`   : null,
+    U.reviews ? `reviews=${U.reviews}` : null,
+  ].filter(Boolean).join(" | ");
+  setText(dbgUrls, urls || "—");
+}
+updateScopeMeta();
+syncDebugToggle();
+
   function updateDataSourceMeta(lastUpdated){
     if (!dataSourceMeta) return;
     const stamp = lastUpdated ? new Date(lastUpdated) : null;
@@ -1140,7 +1160,11 @@
   function updateLiveBadge(count){
     if (!liveBadge) return;
     const safeCount = Number.isFinite(count) ? count : 0;
-    setText(liveBadge, `LIVE: Apify → Supabase (Chicago) • Stores: ${fmt(safeCount)}`);
+    const city = (MARKET_FILTERS.city || "").trim();
+    const stateLabel = formatStateLabel(MARKET_FILTERS.state);
+    const shortState = stateLabel === "Illinois" ? "IL" : stateLabel;
+    const market = [city, shortState].filter(Boolean).join(", ") || "All Markets";
+    setText(liveBadge, `LIVE: Apify → Supabase (${market}) • Stores: ${fmt(safeCount)}`);
   }
 
 
@@ -1222,12 +1246,20 @@
     }
     function setLoadingState(msg){
       showEl(emptyState, "block");
-      setText(emptyState, msg || "Loading weekly data…");
+      emptyState.className = "empty empty--loading";
+      setHTML(emptyState, `<span class="empty-icon">⟳</span> ${escapeHtml(msg || "Loading weekly data…")}`);
       if (tbody) setHTML(tbody, "");
     }
     function setEmptyState(msg){
       showEl(emptyState, "block");
-      setText(emptyState, msg || "No data found for this filter.");
+      emptyState.className = "empty empty--no-data";
+      setHTML(emptyState, `◌ ${escapeHtml(msg || "No data found for this filter.")} <span class="hint">Try adjusting your market filters.</span>`);
+      if (tbody) setHTML(tbody, "");
+    }
+    function setErrorState(msg){
+      showEl(emptyState, "block");
+      emptyState.className = "empty empty--error";
+      setHTML(emptyState, `⚠ ${escapeHtml(msg || "An error occurred while loading data.")}`);
       if (tbody) setHTML(tbody, "");
     }
 
@@ -1392,25 +1424,39 @@
       const scope = [city, shortState].filter(Boolean).join(", ") || "All markets";
       setText(scopeMeta, `Scope: ${scope} • Source: Apify → Supabase`);
     }
-    function syncDebugToggle(){
-      if (!debugToggle || !debugDetails) return;
-      debugToggle.textContent = debugDetails.open ? "Hide Debug" : "Show Debug";
-    }
-    function setMarketFiltersInInputs(filters){
-      if (stateInput) stateInput.value = (filters?.state || "").toUpperCase();
-      if (cityInput) cityInput.value = filters?.city || "";
-    }
-    function loadMarketFiltersFromStorage(){
-      const state = (localStorage.getItem(MARKET_STATE_KEY) || "").trim().toUpperCase();
-      const city = (localStorage.getItem(MARKET_CITY_KEY) || "").trim();
-      return { state: state || null, city: city || null };
-    }
+   function syncDebugToggle(){
+  if (!debugToggle || !debugDetails) return;
+  debugToggle.textContent = debugDetails.open ? "Hide Debug" : "Show Debug";
+}
+
+function normalizeStateForApi(v){
+  v = String(v || "").trim();
+  if (!v) return "";
+  if (v.length <= 2) return v.toUpperCase();
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+}
+
+
+function setMarketFiltersInInputs(filters){
+  if (stateInput) stateInput.value = normalizeStateForApi(filters?.state || "");
+  if (cityInput) cityInput.value = filters?.city || "";
+}
+
+function loadMarketFiltersFromStorage(){
+  const rawState = (localStorage.getItem(MARKET_STATE_KEY) || "").trim();
+  const city = (localStorage.getItem(MARKET_CITY_KEY) || "").trim();
+  const state = normalizeStateForApi(rawState);
+  return { state: state || null, city: city || null };
+}
+
     function loadMarketFiltersFromUrl(){
-      const params = new URLSearchParams(window.location.search);
-      const state = (params.get("state") || "").trim().toUpperCase();
-      const city = (params.get("city") || "").trim();
-      return { state: state || null, city: city || null };
-    }
+  const params = new URLSearchParams(window.location.search);
+  const rawState = (params.get("state") || "").trim();
+  const city = (params.get("city") || "").trim();
+  const state = normalizeStateForApi(rawState);
+  return { state: state || null, city: city || null };
+}
+
     function persistMarketFilters(filters){
       const state = filters?.state || "";
       const city = filters?.city || "";
@@ -1499,7 +1545,7 @@
     }
     function buildMarketQuery(filters){
       const qs = new URLSearchParams();
-      if (filters?.state) qs.set("state", filters.state);
+      if (filters?.state) qs.set("state", normalizeStateForApi(filters.state));
       if (filters?.city) qs.set("city", filters.city);
       return qs;
     }
@@ -1516,9 +1562,12 @@
     const ctrl = new AbortController();
     INFLIGHT.set(url, ctrl);
 
+    const headers = {};
+    if (READ_TOKEN) headers["X-Read-Token"] = READ_TOKEN;
+
     let res;
     try {
-      res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+      res = await fetch(url, { cache: "no-store", signal: ctrl.signal, headers });
     } catch (e) {
       INFLIGHT.delete(url);
       throw new Error(
@@ -1698,16 +1747,12 @@
       log(`GET ${url}`);
       const json = await fetchJSON(url);
       if (!json.ok) throw new Error(json.error || "shops failed");
-      // Load stores from /api/stores-apify
-      STORES_ALL = (json.rows || []);
-      const filteredStores = STORES_ALL
-        .filter(isChicagoOrIllinois)
-        .sort((a,b) => {
-          const ak = normalizeField(a.address || a.name);
-          const bk = normalizeField(b.address || b.name);
-          return ak.localeCompare(bk);
-        });
-      STORES_ALL = filteredStores;
+      // Load stores from /api/stores-apify (server-side filters applied via MARKET_FILTERS)
+      STORES_ALL = (json.rows || []).sort((a,b) => {
+        const ak = normalizeField(a.address || a.name);
+        const bk = normalizeField(b.address || b.name);
+        return ak.localeCompare(bk);
+      });
       updateLiveBadge(STORES_ALL.length);
       console.info("STORES fetch", { url, records: STORES_ALL.length });
       const dupes = scanDuplicateIds(STORES_ALL);
@@ -1769,7 +1814,8 @@
 
     async function loadMetrics(){
       const qs = buildMarketQuery(MARKET_FILTERS);
-      const url = qs.toString() ? `${METRICS_URL}?${qs.toString()}` : METRICS_URL;
+      const url = qs.toString() ? `${EXEC_URL}?${qs.toString()}` : EXEC_URL;
+
       LAST_URLS.metrics = url;
       log(`GET ${url}`);
       const json = await fetchJSON(url);
@@ -1782,24 +1828,7 @@
     }
 
     async function loadDebug(){
-      const qs = buildMarketQuery(MARKET_FILTERS);
-     const url = DEBUG_URL;
-      LAST_URLS.debug = url;
-      log(`GET ${url}`);
-      try {
-        const json = await fetchJSON(url);
-        if (json?.ok) {
-          if (dbgLastUpdated) setText(dbgLastUpdated, json.last_updated || "—");
-          if (dbgFilters && json?.meta?.filtersApplied) {
-            const st = json.meta.filtersApplied.state || "—";
-            const ct = json.meta.filtersApplied.city || "—";
-            setText(dbgFilters, `state=${st} • city=${ct}`);
-          }
-          console.info("DEBUG fetch", { url, stores: json.storesCount, weeklyRows: json.execWeeklyRowsCount, reviews: json.reviewsCount });
-        }
-      } catch (e) {
-        console.warn("PB1 debug load failed:", e?.message || e);
-      }
+      return; // debug endpoint removed; keep UI-only debug panel
     }
 
     function isValidExecRow(row){
@@ -1914,10 +1943,9 @@
       const json = await fetchJSON(url);
       if (!json.ok) throw new Error(json.error || "exec-weekly failed");
       console.info("WEEKLY fetch", { url, records: (json.rows || []).length });
-      const apifyRows = (json.rows || []).filter(isValidExecRow); // APIFY_ONLY_LOCK
-      const chicagoRows = apifyRows.filter(isChicagoOrIllinois);
-      const kpiSafe = computeExecKpis(chicagoRows);
-      const execJson = { ...json, rows: chicagoRows, records: chicagoRows.length, kpis: { ...(json.kpis || {}), ...kpiSafe } };
+      const validRows = (json.rows || []).filter(isValidExecRow); // APIFY_ONLY_LOCK
+      const kpiSafe = computeExecKpis(validRows);
+      const execJson = { ...json, rows: validRows, records: validRows.length, kpis: { ...(json.kpis || {}), ...kpiSafe } };
       LAST_EXEC = execJson;
       updateDataSourceMeta(execJson.last_updated || json.last_updated);
       // do not repopulate store dropdown from exec-weekly
@@ -2840,252 +2868,73 @@
     }
 
     function updateViewHeaders(){
-      const k = LAST_EXEC?.kpis || {};
-      const stores = safeNum(k.stores_reporting, 0);
-      const totalReviews = safeNum(k.total_reviews, 0);
-      const avgStars = safeNum(k.avg_stars_overall, 0);
-      const reviewRows = LAST_REVIEWS?.rows || [];
-      const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
-      const avgReview = rated.length ? (rated.reduce((a,b)=>a+b,0) / rated.length) : 0;
-      const weekLabel = CURRENT_WEEK_LABEL || "Latest (all weeks)";
-      if (viewHeaderMain) {
-        const qualifiers = [];
-        if (stores < 3) qualifiers.push("early sample");
-        if (totalReviews < 10) qualifiers.push("limited reviews");
-        const qualifierText = qualifiers.length ? ` (${qualifiers.join(", ")})` : "";
-        setHTML(viewHeaderMain, `<strong>Executive Overview</strong> • ${weekLabel} • shops ${fmt(stores)} • reviews ${fmt(totalReviews)} • avg ${fmt2(avgStars)}★${qualifierText}`);
-      }
-      if (viewHeaderWeekly) {
-        setHTML(viewHeaderWeekly, `<strong>Weekly Summary</strong> • ${weekLabel} • records ${fmt(LAST_EXEC?.records ?? 0)} • shops ${fmt(stores)} • avg ${fmt2(avgStars)}★`);
-      }
-      if (viewHeaderFeedback) {
-        setHTML(viewHeaderFeedback, `<strong>Feedback Summary</strong> • ${weekLabel} • reviews ${fmt(LAST_REVIEWS?.records ?? 0)} • rated ${fmt(rated.length)} • avg ${fmt2(avgReview)}★`);
-      }
-    }
+  const k = LAST_EXEC?.kpis || {};
+  const stores = safeNum(k.stores_reporting, 0);
+  const totalReviews = safeNum(k.total_reviews, 0);
+  const avgStars = safeNum(k.avg_stars_overall, 0);
+  const reviewRows = LAST_REVIEWS?.rows || [];
+  const rated = reviewRows.map(r => safeNum(r.rating ?? r.stars, 0)).filter(x => x > 0);
+  const avgReview = rated.length ? (rated.reduce((a,b)=>a+b,0) / rated.length) : 0;
+  const weekLabel = CURRENT_WEEK_LABEL || "Latest (all weeks)";
+  if (viewHeaderMain) {
+    const qualifiers = [];
+    if (stores < 3) qualifiers.push("early sample");
+    if (totalReviews < 10) qualifiers.push("limited reviews");
+    const qualifierText = qualifiers.length ? ` (${qualifiers.join(", ")})` : "";
+    setHTML(viewHeaderMain, `<strong>Executive Overview</strong> • ${weekLabel} • shops ${fmt(stores)} • reviews ${fmt(totalReviews)} • avg ${fmt2(avgStars)}★${qualifierText}`);
+  }
+  if (viewHeaderWeekly) {
+    setHTML(viewHeaderWeekly, `<strong>Weekly Summary</strong> • ${weekLabel} • records ${fmt(LAST_EXEC?.records ?? 0)} • shops ${fmt(stores)} • avg ${fmt2(avgStars)}★`);
+  }
+  if (viewHeaderFeedback) {
+    setHTML(viewHeaderFeedback, `<strong>Feedback Summary</strong> • ${weekLabel} • reviews ${fmt(LAST_REVIEWS?.records ?? 0)} • rated ${fmt(rated.length)} • avg ${fmt2(avgReview)}★`);
+  }
+}
 
-    async function loadReviews(){
-      try{
-        const store_id = storeSelect ? String(storeSelect.value || "").trim() : "";
-        const source = currentSource();
+async function fetchReviewsJson({ limit=50, source="apify", state="", city="", store_id="" } = {}){
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (source) qs.set("source", source);
+  if (state) qs.set("state", state);
+  if (city) qs.set("city", city);
+  if (store_id) qs.set("store_id", store_id);
 
-        const stateVal = (stateInput?.value || MARKET_FILTERS.state || "").toString().trim();
-        const cityVal  = (cityInput?.value  || MARKET_FILTERS.city  || "").toString().trim();
+  const url = `${API_BASE}/api/reviews?${qs.toString()}`;
+  const headers = { "Accept": "application/json" };
+  if (READ_TOKEN) headers["X-Read-Token"] = READ_TOKEN;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`reviews_http_${res.status}`);
+  return await res.json();
+}
 
-        const qs = new URLSearchParams();
-        qs.set("limit","60");
-    if (store_id) qs.set("store_id", store_id);
-    qs.set("source", "apify");
-        if (stateVal) qs.set("state", stateVal);
-        if (cityVal) qs.set("city", cityVal);
+function normalizeStateForApi(v){
+  v = String(v || "").trim();
+  if (!v) return "";
+  if (v.length <= 2) return v.toUpperCase(); // IL
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase(); // Illinois
+}
 
-        const url = `${REVIEWS_URL}?${qs.toString()}`;
-        LAST_URLS = LAST_URLS || {};
-        LAST_URLS.reviews = url;
+async function loadReviews(){
+  try{
+    const store_id = storeSelect ? String(storeSelect.value || "").trim() : "";
+    const source = "apify";
 
-    const json = await fetchJSON(url);
+    const stateRaw = (stateInput?.value || MARKET_FILTERS?.state || "");
+    const state = normalizeStateForApi(stateRaw);
+    const city  = String((cityInput?.value  || MARKET_FILTERS?.city  || "")).trim();
 
-    const normalizedRows = (json?.rows || []).map(r => ({
-      store_id: String(r.store_id ?? r.storeId ?? r.store_id_resolved_to ?? "") || null,
-      state: (r.state || "").toString(),
-      city: (r.city || "").toString(),
-      rating: safeNum(r.rating ?? r.stars ?? r.score, 0),
-      review_text: r.review_text ?? r.text ?? r.content ?? null,
-      reviewer_name: r.reviewer_name ?? r.reviewerName ?? null,
-      review_date: r.review_date ?? r.date ?? r.publishedAt ?? r.created_at ?? r.time ?? null,
-      url: r.url ?? r.review_url ?? r.reviewUrl ?? null,
-      source: (r.source || "").toString()
-    })).filter(r => r && r.source.toLowerCase().includes("apify"));
-
-        const marketState = normalizeField(stateVal || "");
-        const marketCity  = normalizeField(cityVal  || "");
-
-        const marketRows = (marketState || marketCity)
-          ? normalizedRows.filter(r => {
-              const rs = normalizeField(r.state);
-              const rc = normalizeField(r.city);
-              const stateOk =
-                !marketState ||
-                rs === marketState ||
-                (marketState === "il" && rs === "illinois") ||
-                (marketState === "illinois" && rs === "il");
-              const cityOk = !marketCity || rc === marketCity;
-              return stateOk && cityOk;
-            })
-          : normalizedRows;
-
-        const storeRows = store_id
-          ? marketRows.filter(r => String(r.store_id || "") === store_id)
-          : marketRows;
-
-        const reviewsJson = { ...json, rows: storeRows, records: storeRows.length };
-        LAST_REVIEWS = reviewsJson;
-
-        console.info("REVIEWS fetch", { url, records: reviewsJson.records });
-
-        if (!json?.ok){
-          setText(reviewsMeta, "Failed to load reviews");
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(json?.error || "Unknown error")}</div>`);
-          updateReviewInsights([], "—");
-          updateDebugPanel();
-          return null;
-        }
-
-        const selectedStore = store_id ? getStoreById(store_id) : null;
-        const storeLabelText = selectedStore?.name || (store_id ? "Selected shop" : "All shops");
-        const filtered = storeRows;
-
-        const sorted = filtered.slice().sort((a,b) => {
-          const da = parseDateSafe(a.review_date)?.getTime() || 0;
-          const db = parseDateSafe(b.review_date)?.getTime() || 0;
-          return db - da;
-        });
-        const displayRows = sorted.slice(0, 18);
-
-        const plat = source ? displaySourceName(source) : "All sources";
-        if (reviewsTitle) {
-          setText(reviewsTitle, store_id ? `Feedback for: ${storeLabelText}` : "Feedback: All shops");
-        }
-        const countText = filtered.length
-          ? `Showing ${fmt(displayRows.length)} of ${fmt(filtered.length)} reviews`
-          : "";
-        setText(reviewsMeta, countText ? `${storeLabelText} • ${plat} • ${countText}` : `${storeLabelText} • ${plat}`);
-
-        updateReviewInsights(sorted, storeLabelText);
-        updateMarketingCx(sorted);
-
-        if (!filtered.length){
-          const msg = "No live reviews yet for this scope.";
-          if (reviewsList) setHTML(reviewsList, `<div class="empty">${escapeHtml(msg)}</div>`);
-          updateDebugPanel();
-          return reviewsJson;
-        }
-
-        if (reviewsList) setHTML(reviewsList, displayRows.map(r => {
-          const date = r.review_date ? escapeHtml(r.review_date) : "";
-          const who = r.reviewer_name ? escapeHtml(r.reviewer_name) : "Anonymous";
-          const txt = r.review_text ? escapeHtml(r.review_text) : "";
-          const link = r.url ? escapeHtml(r.url) : "";
-          const rating = safeNum(r.rating, 0);
-          const ratingText = Number.isFinite(rating) && rating > 0 ? rating : null;
-
-          const tags = [];
-          if (ratingText) tags.push(`<span class="tag mono">${ratingText.toFixed(0)}★</span>`);
-          if ((txt || "").length > 120) tags.push(`<span class="tag mono">long</span>`);
-
-          return `
-            <div class="review-card">
-              <div class="review-top">
-                <div>
-                  <div class="review-name">${who}</div>
-                  <div class="review-meta">${date}</div>
-                </div>
-                <div class="review-stars">${ratingText ? stars(ratingText) : "—"}</div>
-              </div>
-
-              <div class="review-tags">${tags.join("")}</div>
-              <div class="review-text">${txt || "<span style='color:var(--muted);'>No text</span>"}</div>
-              ${link ? `<div class="review-link"><a href="${link}" target="_blank" rel="noreferrer noopener">Open review</a></div>` : ""}
-            </div>
-          `;
-        }).join(""));
-
-        updateDebugPanel();
-        return reviewsJson;
-      } catch(e){
-        showError(`Reviews failed: ${String(e.message || e)}`);
-        return null;
-      }
-    }
-
-
-
-    async function runApply(){
-      try{
-        if (APPLY_INFLIGHT) return;
-        APPLY_INFLIGHT = true;
-        clearError();
-        setLoadingState("Loading weekly data…");
-        const week = getSelectedWeek();
-        const store = storeSelect ? storeSelect.value : "";
-        await loadMeta({ preferredWeek: week });
-        await ensureDefaultWeek();
-        const storeUpdate = await loadStores();
-        if (storeUpdate?.aborted) return;
-        if (storeUpdate?.clearedStore) {
-          await loadDashboard({ store: "", week: LAST_EXEC?.week_ending || week });
-        } else {
-          await loadDashboard({ store, week });
-        }
-        await loadMetrics();
-        const reviewsJson = await loadReviews();
-        const selectedWeek = getSelectedWeek();
-        CURRENT_WEEK_LABEL = selectedWeek
-          ? (LAST_EXEC?.week_ending || selectedWeek)
-          : "Latest (all weeks)";
-        setText($("kpiWeek"), CURRENT_WEEK_LABEL || "Latest (all weeks)");
-        updateWeekWindowLabel();
-        updateWeekNavButtons();
-        console.info("APPLY summary", {
-          apiBase: API_BASE,
-          filters: { state: MARKET_FILTERS.state || "", city: MARKET_FILTERS.city || "" },
-          week: getSelectedWeek() || "latest",
-          counts: {
-            stores: STORES_ALL.length,
-            weekly: LAST_EXEC?.records ?? 0,
-            metrics: LAST_METRICS
-              ? { stores: LAST_METRICS.stores, reviews: LAST_METRICS.reviews, weekly: LAST_METRICS.exec_weekly_rows }
-              : null,
-            reviews: LAST_REVIEWS?.records ?? 0
-          }
-        });
-        await loadDebug();
-        if (LAST_EXEC) renderExecutiveSummary(LAST_EXEC, reviewsJson || LAST_REVIEWS);
-        renderMainDashboard(LAST_EXEC, LAST_REVIEWS);
-        updateViewHeaders();
-        updateDebugPanel();
-      }catch(e){
-        showError(String(e.message || e));
-      } finally {
-        APPLY_INFLIGHT = false;
-      }
-    }
-
-    // Events
-    addListener(reloadBtn, "click", async () => {
-      try{
-        clearError();
-        await runApply();
-      }catch(e){
-        showError(String(e.message || e));
-      }
-    });
-
-    addListener(jsonBtn, "click", () => {
-      const pretty = JSON.stringify({ exec: LAST_EXEC, reviews: LAST_REVIEWS }, null, 2);
-      const w = window.open("", "_blank", "noopener,noreferrer");
-      w.document.write(`<pre style="white-space:pre-wrap;font-family:ui-monospace">${pretty.replaceAll("<","&lt;")}</pre>`);
-      w.document.close();
-    });
-
-    addListener($("drawerClose"), "click", closeDrawer);
-    addListener(kpiModalClose, "click", () => hideEl(kpiModal));
-    addListener(kpiModal, "click", (e) => {
-      if (e.target === kpiModal) hideEl(kpiModal);
-    });
-
-    addListener(viewSelect, "change", () => setView(viewSelect.value));
-    addListener(goTableBtn, "click", () => {
-      setView("ops");
-      $("weeklySection")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    addListener(goReviewsBtn, "click", () => {
-      setView("cx");
-      reviewsList?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    addListener(goCompareBtn, "click", () => {
-      setView("main");
-      $("compareCards")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    const reviewsJson = await fetchReviewsJson({ limit: 60, source, state, city, store_id });
+    LAST_REVIEWS = reviewsJson;
+    renderReviews(reviewsJson?.rows || [], reviewsJson);
+    return reviewsJson;
+  } catch (e){
+    console.error("loadReviews failed:", e);
+    LAST_REVIEWS = { ok:false, rows:[], records:0, error:String(e?.message || e) };
+    renderReviews([], LAST_REVIEWS);
+    showError(`Failed to load reviews: ${e?.message || e}`);
+    return null;
+  }
+}
 
     addListener(compareBtn, "click", renderCompare);
     addListener(compareSelect, "change", renderCompare);
@@ -3257,39 +3106,39 @@
     });
 
     // Init
-    (async function init(){
-      try{
-        setView("main");
-        const urlFilters = loadMarketFiltersFromUrl();
-        const storedFilters = loadMarketFiltersFromStorage();
-        MARKET_FILTERS = {
-          state: urlFilters.state ?? storedFilters.state ?? "Illinois",
-          city: urlFilters.city ?? storedFilters.city ?? "Chicago"
-        };
-        setMarketFiltersInInputs(MARKET_FILTERS);
-        refreshPresetUI();
-        syncWeekControls();
-        updateScopeMeta();
-        syncDebugToggle();
-        if (themeSelect) {
-          const theme = localStorage.getItem("pb1_theme") || "dark";
-          themeSelect.value = theme;
-          document.body.setAttribute("data-theme", theme);
-        }
-        clearError();
-        setLoadingState("Loading metadata…");
-        await runApply();
-      }catch(e){
-        console.error(e);
-        showError(String(e.message || e));
-        setSubline({
-          ok: false,
-          last_updated: new Date().toISOString(),
-          records: LAST_EXEC?.records ?? 0,
-          viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
-        });
-      }
-    })();
-  </script>
-</body>
-</html>
+  (async function init(){
+  try{
+    const urlFilters = loadMarketFiltersFromUrl();
+    const storedFilters = loadMarketFiltersFromStorage();
+
+    MARKET_FILTERS = {
+      state: urlFilters.state ?? storedFilters.state ?? null,
+      city:  urlFilters.city  ?? storedFilters.city  ?? null,
+    };
+
+    setMarketFiltersInInputs(MARKET_FILTERS);
+    refreshPresetUI();
+    syncWeekControls();
+    updateScopeMeta();
+    syncDebugToggle();
+
+    if (themeSelect) {
+      const theme = localStorage.getItem("pb1_theme") || "dark";
+      themeSelect.value = theme;
+      document.body.setAttribute("data-theme", theme);
+    }
+
+    clearError();
+    setLoadingState("Loading metadata…");
+    await runApply();
+  } catch(e){
+    console.error(e);
+    showError(String(e.message || e));
+    setSubline({
+      ok: false,
+      last_updated: new Date().toISOString(),
+      records: LAST_EXEC?.records ?? 0,
+      viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
+    });
+  }
+})()}

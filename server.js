@@ -6,6 +6,12 @@ import express from "express";
 import cors from "cors";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -21,12 +27,16 @@ console.log("✅ SERVER START:", new Date().toISOString());
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const APIFY_TOKEN = process.env.APIFY_TOKEN || "";
-const APIFY_REVIEWS_DATASET_ID =
-  (process.env.APIFY_REVIEWS_DATASET_ID || "").trim() || "yHUzbqQzwRFMtCjAi";
+const APIFY_REVIEWS_DATASET_ID = (process.env.APIFY_REVIEWS_DATASET_ID || "").trim();
 
 // required for ingest protection
 const INGEST_TOKEN = (process.env.INGEST_TOKEN || "").trim();
 console.log("🔐 INGEST_TOKEN loaded?", INGEST_TOKEN ? "YES" : "NO", "len=", INGEST_TOKEN.length);
+
+// optional read API auth (fail-open by default for local dev)
+const READ_API_TOKEN = (process.env.READ_API_TOKEN || "").trim();
+const REQUIRE_READ_AUTH = process.env.REQUIRE_READ_AUTH === "true";
+console.log("🔐 READ_API_TOKEN loaded?", READ_API_TOKEN ? "YES" : "NO", "REQUIRE_READ_AUTH=", REQUIRE_READ_AUTH);
 
 // Table/View names (match your Supabase schema)
 const CFG = {
@@ -53,11 +63,18 @@ app.use(
   cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-Ingest-Token"],
+    allowedHeaders: ["Content-Type", "X-Ingest-Token", "X-Read-Token"],
     maxAge: 86400,
   })
 );
 app.use(express.json({ limit: "2mb" }));
+
+app.use(express.static(path.join(__dirname, "frontend")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "frontend", "index.html"));
+});
+
 
 // Prevent caching on API routes (avoid 304/body issues)
 app.use("/api", function (_req, res, next) {
@@ -91,18 +108,23 @@ function respondError(res, signature, error, status = 500, extra = {}) {
     ...extra,
   });
 }
-function enforceApifySourceParam(req, res, signature) {
-  const raw = (req.query.source ?? "").toString().trim();
-  const normalized = norm(raw);
-  if (raw && normalized !== "apify") {
-    respondError(res, signature, "source_not_allowed", 400, { allowed: ALLOWED_SOURCES });
-    return null;
-  }
-  return "apify";
-}
 function applyApifySourceFilter(q) {
   return q.ilike("source", "%apify%");
 }
+
+/**
+ * Apply source filter to a Supabase query
+ * @param {object} q - Supabase query builder
+ * @param {string|null} source - Source to filter by (null = no filter)
+ * @param {boolean} hasSourceColumn - Whether the table has a source column
+ * @returns {object} Modified query builder
+ */
+function applySourceFilter(q, source, hasSourceColumn) {
+  if (!source || !hasSourceColumn) return q;
+  if (source.toLowerCase() === "apify") return q.ilike("source", "%apify%");
+  return q.eq("source", source);
+}
+
 function isWeekString(v) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
 }
@@ -125,16 +147,28 @@ function normalizeState(input) {
   // if user typed full name already or something else
   return { raw: s, code: null, name: s };
 }
+
+/**
+ * Parse state and city filters from request query parameters
+ * @param {object} req - Express request object
+ * @returns {{ state: {raw: string, code: string, name: string}|null, city: string|null }} Parsed market filters
+ */
 function parseMarketFilters(req) {
   const stateRaw = (req.query.state || "").toString().trim();
   const cityRaw  = (req.query.city  || "").toString().trim();
 
   return {
-    state: stateRaw ? normalizeState(stateRaw) : null, // object {raw,code,name}
+    state: stateRaw ? normalizeState(stateRaw) : null,
     city: cityRaw || null
   };
 }
 
+/**
+ * Apply state and city filters to a Supabase query builder
+ * @param {object} q - Supabase query builder
+ * @param {{ state: {raw: string, code: string, name: string}|null, city: string|null }} filters - Market filters
+ * @returns {object} Modified query builder
+ */
 function applyMarketFilters(q, { state, city } = {}) {
   let out = q;
   const name = state?.name || null;
@@ -166,26 +200,38 @@ async function storeIdExists(id) {
   if (res.error) return false;
   return (res.data || []).length > 0;
 }
-function normalizeAddress(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+
+// Column cache for inferColumns() - avoids repeated DB queries for schema info
+const columnCache = new Map();
+const COLUMN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function inferColumns(tableName) {
+  // Check cache first
+  const cached = columnCache.get(tableName);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.columns;
+  }
+
   try {
     const result = await supabase.from(tableName).select("*").limit(1);
     if (result.error) return { error: result.error.message || String(result.error) };
     const row = (result.data || [])[0];
-    if (!row) return [];
-    return Object.keys(row);
+    const columns = row ? Object.keys(row) : [];
+
+    // Cache the result
+    columnCache.set(tableName, { columns, expiresAt: Date.now() + COLUMN_CACHE_TTL });
+    return columns;
   } catch (e) {
     return { error: e?.message || String(e) };
   }
 }
 
+/**
+ * Middleware check: ensure Supabase client is configured
+ * @param {object} res - Express response object
+ * @param {string} signature - API signature for error response
+ * @returns {boolean} true if Supabase is configured, false otherwise (response already sent)
+ */
 function requireSupabase(res, signature) {
   if (!supabase) {
     respondError(res, signature, "supabase_not_configured", 500);
@@ -193,8 +239,16 @@ function requireSupabase(res, signature) {
   }
   return true;
 }
+
+/**
+ * Middleware check: validate ingest token from header (X-Ingest-Token) or query (?token=)
+ * Fails closed if INGEST_TOKEN env var is not set
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ * @param {string} signature - API signature for error response
+ * @returns {boolean} true if token is valid, false otherwise (response already sent)
+ */
 function requireIngestToken(req, res, signature) {
-  // Fail closed if you forgot to set it (safer)
   if (!INGEST_TOKEN) {
     respondError(res, signature, "ingest_token_not_configured", 403);
     return false;
@@ -206,6 +260,37 @@ function requireIngestToken(req, res, signature) {
 
   if (!token || token !== INGEST_TOKEN) {
     respondError(res, signature, "invalid_ingest_token", 403);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Middleware check: validate read token from header (X-Read-Token) or query (?token=)
+ * Fail-open: no token configured + auth not required = allow (local dev)
+ * Fail-closed: auth required but no token configured = error
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ * @param {string} signature - API signature for error response
+ * @returns {boolean} true if access allowed, false otherwise (response already sent)
+ */
+function requireReadToken(req, res, signature) {
+  // Fail-open: no token configured + auth not required = allow (local dev)
+  if (!READ_API_TOKEN && !REQUIRE_READ_AUTH) return true;
+
+  // Fail-closed: auth required but no token configured = error
+  if (REQUIRE_READ_AUTH && !READ_API_TOKEN) {
+    respondError(res, signature, "read_token_not_configured", 500);
+    return false;
+  }
+
+  // Validate token from header or query param
+  const headerToken = (req.get("x-read-token") || "").trim();
+  const queryToken = (req.query?.token || "").toString().trim();
+  const token = headerToken || queryToken;
+
+  if (!token || token !== READ_API_TOKEN) {
+    respondError(res, signature, "invalid_read_token", 401);
     return false;
   }
   return true;
@@ -251,6 +336,12 @@ function createIngestLimiter(signature) {
   };
 }
 
+/**
+ * Send formatted exec-weekly response with computed KPIs
+ * @param {object} res - Express response object
+ * @param {Array} rowsRaw - Array of weekly rollup rows (from exec_weekly or computed fallback)
+ * @param {{ week: string|null, store: string|null, state: string|null, city: string|null, sourceRequested: string|null, fallbackUsed: boolean }} filters - Applied filters for metadata
+ */
 function sendExecWeekly(res, rowsRaw, filters) {
   const rows = rowsRaw ?? [];
   const week_ending = filters.week || (rows[0]?.week_ending ?? null);
@@ -318,6 +409,7 @@ app.get("/api/health", (_req, res) =>
 // ----- Debug -----
 app.get("/api/debug", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "DEBUG_V1")) return;
     if (!requireSupabase(res, "DEBUG_V1")) return;
 
     const filters = parseMarketFilters(req);
@@ -406,8 +498,6 @@ app.get("/api/debug", async (req, res) => {
       build: BUILD,
       last_updated: new Date().toISOString(),
       error: "server_error",
-      error_detail: e?.message || String(e),
-      stack: process.env.NODE_ENV === "production" ? undefined : e?.stack,
     });
   }
 });
@@ -415,6 +505,7 @@ app.get("/api/debug", async (req, res) => {
 // ---------- /api/reviews ----------
 app.get("/api/reviews", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "REVIEWS_V1")) return;
     if (!requireSupabase(res, "REVIEWS_V1")) return;
 
     const limitRaw = req.query.limit;
@@ -453,10 +544,7 @@ app.get("/api/reviews", async (req, res) => {
       if (storeIdOverride) q = q.eq("store_id", storeIdOverride);
       if (cityFilter) q = q.ilike("city", `%${cityFilter}%`);
       if (stateFilter) q = q.ilike("state", `%${stateFilter}%`);
-      if (wantsSourceFilter) {
-        if (effectiveSource.toLowerCase() === "apify") q = q.ilike("source", "%apify%");
-        else q = q.eq("source", effectiveSource);
-      }
+      q = applySourceFilter(q, effectiveSource, hasSourceColumn);
       return q.limit(limit);
     };
 
@@ -513,68 +601,215 @@ app.get("/api/reviews", async (req, res) => {
   }
 });
 
+// ---------- /api/exec-weekly helpers ----------
+
+/**
+ * Parse and validate query parameters for /api/exec-weekly
+ * @returns {{ weekRaw, store, stateRaw, normalizedState, cityFilter, sourceRequested, wantsSourceFilter, limit } | { error, errorCode, status }}
+ */
+function parseExecWeeklyParams(req) {
+  const weekRaw = (req.query.week ?? "").toString().trim() || null;
+  const store = (req.query.store || req.query.store_id || "").toString().trim() || null;
+  const stateRaw = (req.query.state ?? "").toString().trim() || null;
+  const normalizedState = stateRaw ? normalizeState(stateRaw) : null;
+  const cityFilter = (req.query.city ?? "").toString().trim() || null;
+  const sourceRaw = (req.query.source ?? "").toString().trim();
+  const sourceNorm = sourceRaw.toLowerCase();
+  const hasSourceFilterParam = Boolean(sourceRaw) && sourceNorm !== "all";
+  const effectiveSource = hasSourceFilterParam ? sourceRaw : (sourceNorm === "all" ? null : "apify");
+  const wantsSourceFilter = Boolean(effectiveSource);
+  const sourceRequested = wantsSourceFilter ? effectiveSource : null;
+
+  if (weekRaw && !isWeekString(weekRaw)) {
+    return { error: "invalid_week_format", errorCode: "invalid_week_format", status: 400 };
+  }
+  if (store && !isUuid(store)) {
+    return { error: "invalid_store_id", errorCode: "invalid_store_id", status: 400 };
+  }
+
+  const limitRaw = req.query.limit;
+  if (limitRaw != null && String(limitRaw).trim() !== "") {
+    const limitNum = Number(limitRaw);
+    if (!Number.isFinite(limitNum) || limitNum <= 0) {
+      return { error: "invalid_limit", errorCode: "invalid_limit", status: 400 };
+    }
+  }
+  const limit = parseLimit(req.query.limit ?? 5000, 5000, 5000);
+
+  return { weekRaw, store, stateRaw, normalizedState, cityFilter, sourceRequested, wantsSourceFilter, limit };
+}
+
+/**
+ * Compute week ending date from a review_date string (returns Monday of that week)
+ */
+function computeWeekEnding(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.getUTCDay(); // 0=Sun,1=Mon
+  const offset = (1 - day + 7) % 7;
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Resolve the week to query for exec-weekly (latest week from exec_weekly or reviews)
+ */
+async function resolveWeekForExecWeekly({ store, normalizedState, storeIds, sourceRequested, hasSourceColumn, execWeeklyHasSource }) {
+  let execWeekLatest = null;
+  let reviewWeekLatest = null;
+
+  // Try exec_weekly first
+  let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending");
+  if (store) wq = wq.eq("store_id", store);
+  wq = applyMarketFilters(wq, { state: normalizedState, city: null });
+  wq = applySourceFilter(wq, sourceRequested, execWeeklyHasSource);
+  wq = wq.order("week_ending", { ascending: false });
+  const wres = await wq.limit(1);
+  if (wres.error) throw wres.error;
+  execWeekLatest = wres.data?.[0]?.week_ending ?? null;
+
+  // Try reviews if we have store context
+  if (store || (Array.isArray(storeIds) && storeIds.length)) {
+    let rq = supabase
+      .from(CFG.REVIEWS)
+      .select("review_date")
+      .not("review_date", "is", null)
+      .order("review_date", { ascending: false });
+    if (store) rq = rq.eq("store_id", store);
+    else if (storeIds.length) rq = rq.in("store_id", storeIds);
+    rq = applySourceFilter(rq, sourceRequested, hasSourceColumn);
+    const rres = await rq.limit(1);
+    if (rres.error) throw rres.error;
+    const latestDate = rres.data?.[0]?.review_date ?? null;
+    reviewWeekLatest = latestDate ? computeWeekEnding(latestDate) : null;
+  }
+
+  return execWeekLatest || reviewWeekLatest || null;
+}
+
+/**
+ * Query exec_weekly table with filters
+ */
+async function queryExecWeeklyTable({ week, store, normalizedState, sourceRequested, execWeeklyHasSource, limit }) {
+  let q = supabase
+    .from(CFG.EXEC_WEEKLY)
+    .select("week_ending,store_id,store_name,state,avg_rating,total_reviews,low_reviews,high_reviews")
+    .eq("week_ending", week);
+  if (store) q = q.eq("store_id", store);
+  q = applyMarketFilters(q, { state: normalizedState, city: null });
+  q = applySourceFilter(q, sourceRequested, execWeeklyHasSource);
+  const execRes = await q.limit(limit);
+  if (execRes.error) throw execRes.error;
+  return execRes.data ?? [];
+}
+
+/**
+ * Compute fallback rollups from reviews table when exec_weekly has no data
+ */
+async function computeFallbackFromReviews({ weekStart, weekEnd, store, storeIds, sourceRequested, hasSourceColumn, storeMap }) {
+  // Query reviews in date range
+  let rq = supabase.from(CFG.REVIEWS).select("store_id,rating,review_date");
+  rq = rq.gte("review_date", weekStart).lte("review_date", weekEnd);
+  if (store) rq = rq.eq("store_id", store);
+  else if (Array.isArray(storeIds) && storeIds.length) rq = rq.in("store_id", storeIds);
+  rq = applySourceFilter(rq, sourceRequested, hasSourceColumn);
+  const reviewsRes = await rq;
+  if (reviewsRes.error) throw reviewsRes.error;
+  const reviewsRows = reviewsRes.data ?? [];
+
+  // Fetch store info if needed
+  const localStoreMap = new Map(storeMap);
+  if (!localStoreMap.size && reviewsRows.length) {
+    const reviewStoreIds = [...new Set(reviewsRows.map((r) => r.store_id).filter(Boolean))];
+    if (reviewStoreIds.length) {
+      const sres = await supabase
+        .from(CFG.STORES)
+        .select("id,name,city,state")
+        .in("id", reviewStoreIds);
+      if (sres.error) throw sres.error;
+      for (const s of sres.data || []) {
+        if (s.id) localStoreMap.set(s.id, s);
+      }
+    }
+  }
+
+  // Compute rollups
+  const rollups = new Map();
+  for (const r of reviewsRows) {
+    if (!r.store_id) continue;
+    if (!rollups.has(r.store_id)) {
+      const storeInfo = localStoreMap.get(r.store_id) || {};
+      rollups.set(r.store_id, {
+        week_ending: weekEnd,
+        store_id: r.store_id,
+        store_name: storeInfo.name || null,
+        state: storeInfo.state || null,
+        avg_rating: 0,
+        total_reviews: 0,
+        low_reviews: 0,
+        high_reviews: 0,
+        _rating_sum: 0,
+        _rating_count: 0,
+      });
+    }
+    const rec = rollups.get(r.store_id);
+    rec.total_reviews += 1;
+    const ratingNum = Number(r.rating);
+    if (Number.isFinite(ratingNum)) {
+      rec._rating_sum += ratingNum;
+      rec._rating_count += 1;
+      if (ratingNum <= 2) rec.low_reviews += 1;
+      if (ratingNum >= 4) rec.high_reviews += 1;
+    }
+  }
+
+  // Finalize rollups
+  const fallbackRows = [];
+  for (const rec of rollups.values()) {
+    rec.avg_rating = rec._rating_count > 0 ? Number((rec._rating_sum / rec._rating_count).toFixed(2)) : 0;
+    delete rec._rating_sum;
+    delete rec._rating_count;
+    fallbackRows.push(rec);
+  }
+  fallbackRows.sort((a, b) => {
+    if (b.total_reviews !== a.total_reviews) return b.total_reviews - a.total_reviews;
+    return b.avg_rating - a.avg_rating;
+  });
+
+  return fallbackRows;
+}
+
 // ---------- /api/exec-weekly ----------
 app.get("/api/exec-weekly", async (req, res) => {
-  const errorDetail = (err) => ({
-    message: err?.message ?? null,
-    code: err?.code ?? null,
-    hint: err?.hint ?? null,
-  });
   const respondExecWeeklyError = (where, err) => {
     console.error("❌ /api/exec-weekly error:", where, err);
-    respondError(res, "EXEC_WEEKLY_V1", "server_error", 500, {
-      where,
-      error_detail: errorDetail(err),
-    });
+    respondError(res, "EXEC_WEEKLY_V1", "server_error", 500);
   };
 
   try {
+    if (!requireReadToken(req, res, "EXEC_WEEKLY_V1")) return;
     if (!requireSupabase(res, "EXEC_WEEKLY_V1")) return;
 
-    const weekRaw = (req.query.week ?? "").toString().trim() || null;
-    const store = (req.query.store || req.query.store_id || "").toString().trim() || null;
-    const stateRaw = (req.query.state ?? "").toString().trim() || null;
-    const normalizedState = stateRaw ? normalizeState(stateRaw) : null;
-    const cityFilter = (req.query.city ?? "").toString().trim() || null;
-    const sourceRaw = (req.query.source ?? "").toString().trim();
-    const sourceNorm = sourceRaw.toLowerCase();
-    const hasSourceFilterParam = Boolean(sourceRaw) && sourceNorm !== "all";
-    const effectiveSource = hasSourceFilterParam ? sourceRaw : (sourceNorm === "all" ? null : "apify");
-    const wantsSourceFilter = Boolean(effectiveSource);
-    const sourceRequested = wantsSourceFilter ? effectiveSource : null;
-
-    if (weekRaw && !isWeekString(weekRaw)) {
-      return respondError(res, "EXEC_WEEKLY_V1", "invalid_week_format", 400);
+    // Parse and validate parameters
+    const params = parseExecWeeklyParams(req);
+    if (params.error) {
+      return respondError(res, "EXEC_WEEKLY_V1", params.errorCode, params.status);
     }
-    if (store && !isUuid(store)) {
-      return respondError(res, "EXEC_WEEKLY_V1", "invalid_store_id", 400);
-    }
+    const { weekRaw, store, stateRaw, normalizedState, cityFilter, sourceRequested, limit } = params;
 
-    const limitRaw = req.query.limit;
-    if (limitRaw != null && String(limitRaw).trim() !== "") {
-      const limitNum = Number(limitRaw);
-      if (!Number.isFinite(limitNum) || limitNum <= 0) {
-        return respondError(res, "EXEC_WEEKLY_V1", "invalid_limit", 400);
-      }
-    }
-    const limit = parseLimit(req.query.limit ?? 5000, 5000, 5000);
-
+    // Infer source column availability
     let hasSourceColumn = false;
+    let execWeeklyHasSource = false;
     try {
       const reviewsColumns = await inferColumns(CFG.REVIEWS);
       hasSourceColumn = Array.isArray(reviewsColumns) && reviewsColumns.includes("source");
-    } catch (e) {
-      return respondExecWeeklyError("execWeekly:reviewsColumns", e);
-    }
-    let execWeeklyHasSource = false;
-    try {
       const execWeeklyColumns = await inferColumns(CFG.EXEC_WEEKLY);
-      execWeeklyHasSource =
-        Array.isArray(execWeeklyColumns) && execWeeklyColumns.includes("source");
+      execWeeklyHasSource = Array.isArray(execWeeklyColumns) && execWeeklyColumns.includes("source");
     } catch (e) {
-      return respondExecWeeklyError("execWeekly:execWeeklyColumns", e);
+      return respondExecWeeklyError("execWeekly:columns", e);
     }
 
+    // Resolve store IDs for state filtering
     let storeIds = null;
     const storeMap = new Map();
     if (store) {
@@ -595,71 +830,27 @@ app.get("/api/exec-weekly", async (req, res) => {
       }
     }
 
-    const computeWeekEnding = (dateStr) => {
-      const d = new Date(`${dateStr}T00:00:00Z`);
-      if (Number.isNaN(d.getTime())) return null;
-      const day = d.getUTCDay(); // 0=Sun,1=Mon
-      const offset = (1 - day + 7) % 7;
-      d.setUTCDate(d.getUTCDate() + offset);
-      return d.toISOString().slice(0, 10);
+    // Logging helper
+    const logExecWeekly = ({ usedFallback, records, week }) => {
+      console.info("exec-weekly", { week: week ?? null, state: stateRaw ?? null, store: store ?? null, usedFallback, records });
     };
 
+    // Resolve week if not provided
     let resolvedWeek = weekRaw;
     if (!resolvedWeek && Array.isArray(storeIds)) {
-      let execWeekLatest = null;
-      let reviewWeekLatest = null;
       try {
-        let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending");
-        if (store) wq = wq.eq("store_id", store);
-        wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) {
-          if (sourceRequested.toLowerCase() === "apify") wq = wq.ilike("source", "%apify%");
-          else wq = wq.eq("source", sourceRequested);
-        }
-        wq = wq.order("week_ending", { ascending: false });
-        const wres = await wq.limit(1);
-        if (wres.error) throw wres.error;
-        execWeekLatest = wres.data?.[0]?.week_ending ?? null;
+        resolvedWeek = await resolveWeekForExecWeekly({ store, normalizedState, storeIds, sourceRequested, hasSourceColumn, execWeeklyHasSource });
       } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekExec", e);
+        return respondExecWeeklyError("execWeekly:resolveWeek", e);
       }
-      try {
-        if (store || (Array.isArray(storeIds) && storeIds.length)) {
-          let rq = supabase
-            .from(CFG.REVIEWS)
-            .select("review_date")
-            .not("review_date", "is", null)
-            .order("review_date", { ascending: false });
-          if (store) rq = rq.eq("store_id", store);
-          else if (storeIds.length) rq = rq.in("store_id", storeIds);
-          if (sourceRequested && hasSourceColumn) {
-            if (sourceRequested.toLowerCase() === "apify") rq = rq.ilike("source", "%apify%");
-            else rq = rq.eq("source", sourceRequested);
-          }
-          const rres = await rq.limit(1);
-          if (rres.error) throw rres.error;
-          const latestDate = rres.data?.[0]?.review_date ?? null;
-          reviewWeekLatest = latestDate ? computeWeekEnding(latestDate) : null;
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:resolveWeekReviews", e);
-      }
-      if (execWeekLatest) resolvedWeek = execWeekLatest;
-      else resolvedWeek = reviewWeekLatest || null;
     }
 
+    // Global week lookup if no store/state filter
     if (!resolvedWeek && storeIds === null) {
       try {
-        let wq = supabase
-          .from(CFG.EXEC_WEEKLY)
-          .select("week_ending")
-          .order("week_ending", { ascending: false })
-          .limit(1);
+        let wq = supabase.from(CFG.EXEC_WEEKLY).select("week_ending").order("week_ending", { ascending: false }).limit(1);
         wq = applyMarketFilters(wq, { state: normalizedState, city: null });
-        if (sourceRequested && execWeeklyHasSource) {
-          if (sourceRequested.toLowerCase() === "apify") wq = wq.ilike("source", "%apify%");
-          else wq = wq.eq("source", sourceRequested);
-        }
+        wq = applySourceFilter(wq, sourceRequested, execWeeklyHasSource);
         const wres = await wq;
         if (wres.error) throw wres.error;
         resolvedWeek = wres.data?.[0]?.week_ending ?? null;
@@ -668,173 +859,57 @@ app.get("/api/exec-weekly", async (req, res) => {
       }
     }
 
-    const logExecWeekly = ({ usedFallback, records, week }) => {
-      console.info("exec-weekly", {
-        week: week ?? null,
-        state: stateRaw ?? null,
-        store: store ?? null,
-        usedFallback,
-        records,
-      });
-    };
+    const responseFilters = { week: resolvedWeek, store, state: stateRaw, city: cityFilter, sourceRequested };
 
+    // No week resolved - return empty
     if (!resolvedWeek) {
       logExecWeekly({ usedFallback: false, records: 0, week: null });
-      return sendExecWeekly(res, [], {
-        week: null,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
+      return sendExecWeekly(res, [], { ...responseFilters, week: null, fallbackUsed: false });
     }
 
+    // Query exec_weekly table
     let execRows = [];
     try {
-      let q = supabase
-        .from(CFG.EXEC_WEEKLY)
-        .select("week_ending,store_id,store_name,state,avg_rating,total_reviews,low_reviews,high_reviews")
-        .eq("week_ending", resolvedWeek);
-      if (store) q = q.eq("store_id", store);
-      q = applyMarketFilters(q, { state: normalizedState, city: null });
-      if (sourceRequested && execWeeklyHasSource) {
-        if (sourceRequested.toLowerCase() === "apify") q = q.ilike("source", "%apify%");
-        else q = q.eq("source", sourceRequested);
-      }
-      const execRes = await q.limit(limit);
-      if (execRes.error) throw execRes.error;
-      execRows = execRes.data ?? [];
+      execRows = await queryExecWeeklyTable({ week: resolvedWeek, store, normalizedState, sourceRequested, execWeeklyHasSource, limit });
     } catch (e) {
       return respondExecWeeklyError("execWeekly:execWeeklyQuery", e);
     }
 
     if (execRows.length) {
       logExecWeekly({ usedFallback: false, records: execRows.length, week: resolvedWeek });
-      return sendExecWeekly(res, execRows, {
-        week: resolvedWeek,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
+      return sendExecWeekly(res, execRows, { ...responseFilters, fallbackUsed: false });
     }
 
+    // No stores in filtered state - return empty
     if (normalizedState && Array.isArray(storeIds) && storeIds.length === 0) {
       logExecWeekly({ usedFallback: false, records: 0, week: resolvedWeek });
-      return sendExecWeekly(res, [], {
-        week: resolvedWeek,
-        store,
-        state: stateRaw,
-        city: cityFilter,
-        sourceRequested,
-        fallbackUsed: false,
-      });
+      return sendExecWeekly(res, [], { ...responseFilters, fallbackUsed: false });
     }
 
+    // Compute fallback from reviews
     const endDate = new Date(`${resolvedWeek}T00:00:00Z`);
     const startDate = new Date(endDate.getTime());
     startDate.setUTCDate(startDate.getUTCDate() - 6);
     const weekStart = startDate.toISOString().slice(0, 10);
-    const weekEnd = resolvedWeek;
 
-    let reviewsRows = [];
+    let fallbackRows = [];
     try {
-      let rq = supabase.from(CFG.REVIEWS).select("store_id,rating,review_date");
-      rq = rq.gte("review_date", weekStart).lte("review_date", weekEnd);
-    if (store) rq = rq.eq("store_id", store);
-    else if (Array.isArray(storeIds) && storeIds.length) rq = rq.in("store_id", storeIds);
-    if (sourceRequested && hasSourceColumn) {
-      if (sourceRequested.toLowerCase() === "apify") rq = rq.ilike("source", "%apify%");
-      else rq = rq.eq("source", sourceRequested);
-    }
-      const reviewsRes = await rq;
-      if (reviewsRes.error) throw reviewsRes.error;
-      reviewsRows = reviewsRes.data ?? [];
+      fallbackRows = await computeFallbackFromReviews({ weekStart, weekEnd: resolvedWeek, store, storeIds, sourceRequested, hasSourceColumn, storeMap });
     } catch (e) {
-      return respondExecWeeklyError("execWeekly:fallbackReviews", e);
+      return respondExecWeeklyError("execWeekly:fallback", e);
     }
-
-    if (!storeMap.size && reviewsRows.length) {
-      try {
-        const reviewStoreIds = [
-          ...new Set(reviewsRows.map((r) => r.store_id).filter(Boolean)),
-        ];
-        if (reviewStoreIds.length) {
-          const sres = await supabase
-            .from(CFG.STORES)
-            .select("id,name,city,state")
-            .in("id", reviewStoreIds);
-          if (sres.error) throw sres.error;
-          for (const s of sres.data || []) {
-            if (s.id) storeMap.set(s.id, s);
-          }
-        }
-      } catch (e) {
-        return respondExecWeeklyError("execWeekly:fallbackStores", e);
-      }
-    }
-
-    const rollups = new Map();
-    for (const r of reviewsRows) {
-      if (!r.store_id) continue;
-      if (!rollups.has(r.store_id)) {
-        const storeInfo = storeMap.get(r.store_id) || {};
-        rollups.set(r.store_id, {
-          week_ending: resolvedWeek,
-          store_id: r.store_id,
-          store_name: storeInfo.name || null,
-          state: storeInfo.state || null,
-          avg_rating: 0,
-          total_reviews: 0,
-          low_reviews: 0,
-          high_reviews: 0,
-          _rating_sum: 0,
-          _rating_count: 0,
-        });
-      }
-      const rec = rollups.get(r.store_id);
-      rec.total_reviews += 1;
-      const ratingNum = Number(r.rating);
-      if (Number.isFinite(ratingNum)) {
-        rec._rating_sum += ratingNum;
-        rec._rating_count += 1;
-        if (ratingNum <= 2) rec.low_reviews += 1;
-        if (ratingNum >= 4) rec.high_reviews += 1;
-      }
-    }
-
-    const fallbackRows = [];
-    for (const rec of rollups.values()) {
-      rec.avg_rating =
-        rec._rating_count > 0 ? Number((rec._rating_sum / rec._rating_count).toFixed(2)) : 0;
-      delete rec._rating_sum;
-      delete rec._rating_count;
-      fallbackRows.push(rec);
-    }
-    fallbackRows.sort((a, b) => {
-      if (b.total_reviews !== a.total_reviews) return b.total_reviews - a.total_reviews;
-      return b.avg_rating - a.avg_rating;
-    });
 
     logExecWeekly({ usedFallback: true, records: fallbackRows.length, week: resolvedWeek });
-    return sendExecWeekly(res, fallbackRows, {
-      week: resolvedWeek,
-      store,
-      state: stateRaw,
-      city: cityFilter,
-      sourceRequested,
-      fallbackUsed: true,
-    });
+    return sendExecWeekly(res, fallbackRows, { ...responseFilters, fallbackUsed: true });
   } catch (e) {
     return respondExecWeeklyError("execWeekly:unknown", e);
   }
 });
 
 // ---------- /api/meta ----------
-app.get("/api/meta", async (_req, res) => {
+app.get("/api/meta", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "META_V1")) return;
     if (!requireSupabase(res, "META_V1")) return;
 
     let data = null;
@@ -880,6 +955,7 @@ app.get("/api/meta", async (_req, res) => {
 // ---------- /api/stores ----------
 app.get("/api/stores", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "STORES_V1")) return;
     if (!requireSupabase(res, "STORES_V1")) return;
 
     const limitRaw = req.query.limit;
@@ -933,6 +1009,7 @@ app.get("/api/stores", async (req, res) => {
 // ---------- /api/store/:store_id ----------
 app.get("/api/store/:store_id", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "STORE_V1_SHAPE")) return;
     if (!requireSupabase(res, "STORE_V1_SHAPE")) return;
 
     const store_id = (req.params.store_id || "").toString().trim();
@@ -966,8 +1043,9 @@ app.get("/api/store/:store_id", async (req, res) => {
 });
 
 // ---------- /api/stores/summary ----------
-app.get("/api/stores/summary", async (_req, res) => {
+app.get("/api/stores/summary", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "STORES_SUMMARY_V1")) return;
     if (!requireSupabase(res, "STORES_SUMMARY_V1")) return;
 
     const attempt = await supabase
@@ -1014,20 +1092,13 @@ app.get("/api/stores/summary", async (_req, res) => {
 
 // ---------- /api/metrics ----------
 app.get("/api/metrics", async (req, res) => {
-  const errorDetail = (err) => ({
-    message: err?.message ?? null,
-    code: err?.code ?? null,
-    hint: err?.hint ?? null,
-  });
   const respondMetricsError = (where, err) => {
     console.error("❌ /api/metrics error:", where, err);
-    respondError(res, "METRICS_V1", "server_error", 500, {
-      where,
-      error_detail: errorDetail(err),
-    });
+    respondError(res, "METRICS_V1", "server_error", 500);
   };
 
   try {
+    if (!requireReadToken(req, res, "METRICS_V1")) return;
     if (!requireSupabase(res, "METRICS_V1")) return;
 
     const stateRaw = (req.query.state ?? "").toString().trim();
@@ -1105,10 +1176,7 @@ app.get("/api/metrics", async (req, res) => {
     try {
       let reviewsQuery = supabase.from(CFG.REVIEWS).select("external_id", { count: "exact", head: true });
       if (storeIds.length) reviewsQuery = reviewsQuery.in("store_id", storeIds);
-      if (wantsSourceFilter) {
-        if (effectiveSource.toLowerCase() === "apify") reviewsQuery = reviewsQuery.ilike("source", "%apify%");
-        else reviewsQuery = reviewsQuery.eq("source", effectiveSource);
-      }
+      reviewsQuery = applySourceFilter(reviewsQuery, effectiveSource, hasSourceColumn);
       const reviews = await reviewsQuery;
       if (reviews.error) throw reviews.error;
       reviewsCount = reviews.count ?? null;
@@ -1166,6 +1234,11 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
     if (!requireSupabase(res, "INGEST_APIFY_REVIEWS_V1")) return;
     if (!APIFY_TOKEN) {
       return respondError(res, "INGEST_APIFY_REVIEWS_V1", "apify_token_not_configured", 500);
+    }
+    if (!APIFY_REVIEWS_DATASET_ID) {
+      return respondError(res, "INGEST_APIFY_REVIEWS_V1", "apify_reviews_dataset_id_not_configured", 500, {
+        hint: "Set APIFY_REVIEWS_DATASET_ID environment variable to the dataset containing reviews"
+      });
     }
 
     const datasetId = APIFY_REVIEWS_DATASET_ID;
@@ -1375,9 +1448,7 @@ app.post("/api/ingest/apify-reviews", async (req, res) => {
     });
   } catch (e) {
     console.error("❌ /api/ingest/apify-reviews error:", e);
-    return respondError(res, "INGEST_APIFY_REVIEWS_V1", "server_error", 500, {
-      error_detail: e?.message || String(e),
-    });
+    return respondError(res, "INGEST_APIFY_REVIEWS_V1", "server_error", 500);
   }
 });
 
@@ -1402,9 +1473,7 @@ app.post("/api/admin/purge-bad-apify", async (req, res) => {
     });
   } catch (e) {
     console.error("❌ /api/admin/purge-bad-apify error:", e);
-    respondError(res, "ADMIN_PURGE_BAD_APIFY_V1", "server_error", 500, {
-      error_detail: e?.message || String(e),
-    });
+    respondError(res, "ADMIN_PURGE_BAD_APIFY_V1", "server_error", 500);
   }
 });
 
@@ -1587,6 +1656,7 @@ app.post("/api/ingest/apify/pull", createIngestLimiter("INGEST_APIFY_PULL_V1"), 
 // Frontend expects rows[].id to exist, so we set id = store_id.
 app.get("/api/stores-apify", async (req, res) => {
   try {
+    if (!requireReadToken(req, res, "STORES_APIFY_V1")) return;
     if (!requireSupabase(res, "STORES_APIFY_V1")) return;
 
     const limit = parseLimit(req.query.limit ?? 200, 200, 2000);
