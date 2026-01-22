@@ -879,15 +879,20 @@
             <div class="mono" id="dbgLastUpdated">—</div>
           </div>
         </div>
+        <div class="mono" style="margin-top:10px; font-size:12px; padding:10px; background:rgba(0,0,0,.2); border-radius:4px;">
+          <div style="color:#0f0; font-weight:bold; margin-bottom:5px;">Request Log</div>
+          <div id="dbgUrls">—</div>
+        </div>
+        <div class="mono" style="margin-top:10px; font-size:12px; padding:10px; background:rgba(80,0,0,.3); border-radius:4px;">
+          <div style="color:#f88; font-weight:bold; margin-bottom:5px;">Last Error</div>
+          <div id="dbgError" style="color:#faa;">—</div>
+        </div>
         <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:10px;">
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
           <button id="exportCsvBtn" class="btn-ghost">Export current table CSV</button>
           <button id="openExecJsonBtn" class="btn-ghost">Open exec JSON</button>
           <button id="openReviewsJsonBtn" class="btn-ghost">Open reviews JSON</button>
-        </div>
-        <div class="mono" style="margin-top:10px; font-size:12px;">
-          <div id="dbgUrls">—</div>
         </div>
       </details>
     </div>
@@ -983,6 +988,7 @@ function getApiBase() {
 
 const API_BASE = getApiBase();
 window.API_BASE = API_BASE; // expose for console debugging
+console.log(`[PB1] API_BASE=${API_BASE}`);
 
 // Read API token (set window.PB1_READ_TOKEN before page load if auth required)
 const READ_TOKEN = window.PB1_READ_TOKEN || "";
@@ -1071,6 +1077,7 @@ const REVIEWS_URL = `${API_BASE}/api/reviews`;
     const dbgFilters = $("dbgFilters");
     const dbgLastUpdated = $("dbgLastUpdated");
     const dbgUrls = $("dbgUrls");
+    const dbgError = $("dbgError");
     const debugToggle = $("debugToggle");
     const debugDetails = $("debugDetails");
     const exportCsvBtn = $("exportCsvBtn");
@@ -1226,6 +1233,7 @@ syncDebugToggle();
     let META = null;
     let STORES = [];
     let STORES_ALL = [];
+    window.STORES_ALL = STORES_ALL; // expose for console debugging
     let LAST_EXEC = null;
     let LAST_REVIEWS = null;
     let LAST_METRICS = null;
@@ -1254,6 +1262,9 @@ syncDebugToggle();
       errorBanner.classList.remove("warn");
       showEl(errorBanner, "block");
       setText(errorBanner, msg);
+      // Auto-open debug panel on error
+      const details = $("debugDetails");
+      if (details && !details.open) details.open = true;
     }
     function showWarning(msg){
       if (!errorBanner) return;
@@ -1575,10 +1586,35 @@ function loadMarketFiltersFromStorage(){
 
    const FETCH_CACHE = new Map();
    const INFLIGHT = new Map();
+   const REQUEST_LOG = [];
+   function logRequest(tag, url, status, error = null) {
+     const stamp = new Date().toISOString().split('T')[1].slice(0,12);
+     const entry = { tag, url, status, error, stamp };
+     REQUEST_LOG.push(entry);
+     if (REQUEST_LOG.length > 20) REQUEST_LOG.shift();
+     console.log(`[PB1][${tag}] ${status} -> ${url}`, error || '');
+     updateDebugUrls();
+     if (error) {
+       if (dbgError) setText(dbgError, `[${stamp}] ${tag}: ${error}`);
+     }
+   }
+   function updateDebugUrls() {
+     if (!dbgUrls) return;
+     const lines = REQUEST_LOG.slice(-10).reverse().map(e => {
+       const color = e.error ? '#f88' : (e.status >= 200 && e.status < 300 ? '#0f0' : '#fa0');
+       const shortUrl = e.url.replace(API_BASE, '').slice(0, 80);
+       return `<div style="color:${color};">[${e.stamp}] ${e.tag}: ${e.status} ${shortUrl}</div>`;
+     }).join('');
+     setHTML(dbgUrls, lines || '—');
+   }
    async function fetchJSON(url, { ttl = 60000 } = {}) {
+    const tag = url.includes('/meta') ? 'META' : url.includes('/stores') ? 'STORES' : url.includes('/exec-weekly') ? 'WEEKLY' : url.includes('/reviews') ? 'REVIEWS' : 'API';
     const now = Date.now();
     const cached = FETCH_CACHE.get(url);
-    if (cached && (now - cached.t) < ttl) return cached.v;
+    if (cached && (now - cached.t) < ttl) {
+      logRequest(tag, url, 'CACHED');
+      return cached.v;
+    }
 
     const prev = INFLIGHT.get(url);
     if (prev) prev.abort();
@@ -1593,9 +1629,9 @@ function loadMarketFiltersFromStorage(){
       res = await fetch(url, { cache: "no-store", signal: ctrl.signal, headers });
     } catch (e) {
       INFLIGHT.delete(url);
-      throw new Error(
-        `API unreachable: ${url}. If local, confirm backend running on :10000.`
-      );
+      const errMsg = `API unreachable: ${url}. If local, confirm backend running on :10000.`;
+      logRequest(tag, url, 'FAIL', errMsg);
+      throw new Error(errMsg);
     }
     INFLIGHT.delete(url);
     const text = await res.text();
@@ -1605,15 +1641,24 @@ function loadMarketFiltersFromStorage(){
         const parsed = JSON.parse(text);
         message = parsed?.error?.message || parsed?.error || parsed?.message || message;
       } catch {}
-      throw new Error(`HTTP ${res.status} ${message ? `• ${message}` : ""} (${url})`);
+      const errMsg = `HTTP ${res.status} ${message ? `• ${message}` : ""}`;
+      logRequest(tag, url, res.status, errMsg);
+      throw new Error(`${errMsg} (${url})`);
     }
-    if (!text) throw new Error(`Empty JSON response for ${url}`);
+    if (!text) {
+      const errMsg = `Empty JSON response for ${url}`;
+      logRequest(tag, url, res.status, errMsg);
+      throw new Error(errMsg);
+    }
     let parsed;
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      throw new Error(`Invalid JSON for ${url}`);
+      const errMsg = `Invalid JSON for ${url}`;
+      logRequest(tag, url, res.status, errMsg);
+      throw new Error(errMsg);
     }
+    logRequest(tag, url, res.status);
     FETCH_CACHE.set(url, { t: now, v: parsed });
     return parsed;
   }
@@ -1776,8 +1821,9 @@ function loadMarketFiltersFromStorage(){
         const bk = normalizeField(b.address || b.name);
         return ak.localeCompare(bk);
       });
+      window.STORES_ALL = STORES_ALL; // sync to window for debugging
       updateLiveBadge(STORES_ALL.length);
-      console.info("STORES fetch", { url, records: STORES_ALL.length });
+      console.info(`[PB1][STORES] Loaded ${STORES_ALL.length} stores from ${url}`);
       const dupes = scanDuplicateIds(STORES_ALL);
       if (dupes.length) {
         DUPLICATE_IDS_FOUND = true;
@@ -3026,6 +3072,31 @@ async function loadReviews(){
       if (e.target === evidenceModal) hideEl(evidenceModal);
     });
 
+    // Main data loading orchestrator
+    async function runApply(){
+      try{
+        clearError();
+        setLoadingState("Loading weekly data…");
+        const week = getSelectedWeek();
+        const store = storeSelect ? storeSelect.value : "";
+        const storeUpdate = await loadStores();
+        if (storeUpdate?.aborted) return;
+        if (storeUpdate?.clearedStore) {
+          await loadDashboard({ store: "", week: LAST_EXEC?.week_ending || week });
+        } else {
+          await loadDashboard({ store, week });
+        }
+        await loadMetrics();
+        await loadReviews();
+        await loadDebug();
+        renderMainDashboard(LAST_EXEC, LAST_REVIEWS);
+        updateDebugPanel();
+      }catch(e){
+        console.error("[runApply] Error:", e);
+        showError(String(e.message || e));
+      }
+    }
+
     // Auto-apply changes
     const debouncedWeekApply = debounce(() => runApply(), 300);
     addListener(weekAllToggle, "change", () => {
@@ -3164,4 +3235,4 @@ async function loadReviews(){
       viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
     });
   }
-})()}
+})()
