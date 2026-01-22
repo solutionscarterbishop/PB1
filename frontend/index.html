@@ -961,7 +961,28 @@
     if (el) el.addEventListener(event, handler, opts);
   }
 
-const API_BASE = "http://localhost:10000/api";
+function getApiBase() {
+  // 1. Query param override: ?api=https://example.com
+  const params = new URLSearchParams(window.location.search);
+  const apiParam = params.get("api");
+  if (apiParam) return decodeURIComponent(apiParam).replace(/\/$/, "");
+
+  // 2. localStorage override: localStorage.setItem("PB1_API_BASE", "https://...")
+  const stored = localStorage.getItem("PB1_API_BASE");
+  if (stored) return stored.replace(/\/$/, "");
+
+  // 3. Local dev: localhost, 127.0.0.1, or file://
+  const h = location.hostname;
+  if (h === "localhost" || h === "127.0.0.1" || location.protocol === "file:") {
+    return "http://localhost:10000";
+  }
+
+  // 4. Production default (Render.com deployment)
+  return "https://pb1-t52r.onrender.com";
+}
+
+const API_BASE = getApiBase();
+window.API_BASE = API_BASE; // expose for console debugging
 
 // Read API token (set window.PB1_READ_TOKEN before page load if auth required)
 const READ_TOKEN = window.PB1_READ_TOKEN || "";
@@ -970,6 +991,7 @@ const READ_TOKEN = window.PB1_READ_TOKEN || "";
   const log = (...a) => DEBUG && console.log(...a);
   const MIN_STORES = 5;
 
+// API_BASE is HOST ONLY (no /api), endpoints add /api prefix
 const EXEC_URL    = `${API_BASE}/api/exec-weekly`;
 const META_URL    = `${API_BASE}/api/meta`;
 const STORES_URL  = `${API_BASE}/api/stores-apify`;
@@ -1155,7 +1177,8 @@ syncDebugToggle();
     if (!dataSourceMeta) return;
     const stamp = lastUpdated ? new Date(lastUpdated) : null;
     const text = stamp ? stamp.toLocaleString() : "—";
-    setText(dataSourceMeta, `Data source: LOCAL API • Last updated: ${text}`);
+    const apiLabel = API_BASE.includes("localhost") ? "LOCAL" : "PROD";
+    setText(dataSourceMeta, `Data source: ${apiLabel} (${API_BASE}) • Last updated: ${text}`);
   }
   function updateLiveBadge(count){
     if (!liveBadge) return;
