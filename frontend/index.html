@@ -942,6 +942,8 @@
 
 <script>
 console.log("[PB1][BOOT] script loaded", new Date().toISOString());
+window.addEventListener("error", e => console.error("[PB1][ERR]", e.message, e.error || ""));
+window.addEventListener("unhandledrejection", e => console.error("[PB1][REJECT]", e.reason));
   // Tiny DOM helper (you removed this earlier)
   function $(id) {
     return document.getElementById(id);
@@ -1003,7 +1005,25 @@ const EXEC_URL    = `${API_BASE}/api/exec-weekly`;
 const META_URL    = `${API_BASE}/api/meta`;
 const STORES_URL  = `${API_BASE}/api/stores-apify`;
 const REVIEWS_URL = `${API_BASE}/api/reviews`;
-  
+
+// Guaranteed preload - fires core requests even if other code fails
+async function preloadCore(){
+  try{
+    console.log("[PB1][PRELOAD] starting");
+    const m = `${META_URL}`;
+    const s = `${STORES_URL}?limit=500`;
+    console.log("[PB1][META] request", m);
+    const metaRes = await fetch(m);
+    console.log("[PB1][META] response", metaRes.status, metaRes.ok);
+    console.log("[PB1][STORES] request", s);
+    const storesRes = await fetch(s);
+    console.log("[PB1][STORES] response", storesRes.status, storesRes.ok);
+    console.log("[PB1][PRELOAD] complete");
+  }catch(e){
+    console.error("[PB1][PRELOAD] failed", e);
+  }
+}
+
 
   const MARKET_STATE_KEY = "pb1_market_state";
   const MARKET_CITY_KEY = "pb1_market_city";
@@ -3095,6 +3115,8 @@ async function loadReviews(){
       }catch(e){
         console.error("[runApply] Error:", e);
         showError(String(e.message || e));
+      }finally{
+        setLoadingState("");
       }
     }
     window.runApply = runApply; // expose globally
@@ -3201,8 +3223,13 @@ async function loadReviews(){
       });
     });
 
-    // Init
-  (async function init(){
+    // Init - MUST wait for DOM
+  window.addEventListener("DOMContentLoaded", async () => {
+  console.log("[PB1][BOOT] DOMContentLoaded - starting init", document.readyState);
+
+  // Fire preload FIRST to guarantee requests even if init fails
+  await preloadCore();
+
   try{
     const urlFilters = loadMarketFiltersFromUrl();
     const storedFilters = loadMarketFiltersFromStorage();
@@ -3226,7 +3253,9 @@ async function loadReviews(){
 
     clearError();
     setLoadingState("Loading metadata…");
+    console.log("[PB1][BOOT] calling runApply");
     await runApply();
+    console.log("[PB1][BOOT] init complete");
   } catch(e){
     console.error("[PB1][INIT] Error:", e);
     showError(String(e.message || e));
@@ -3236,19 +3265,7 @@ async function loadReviews(){
       records: LAST_EXEC?.records ?? 0,
       viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
     });
-  }
-})();
-
-// Safety net: force boot on DOMContentLoaded if init IIFE didn't run
-window.addEventListener("DOMContentLoaded", () => {
-  try {
-    console.log("[PB1][BOOT] DOMContentLoaded", document.readyState);
-    if (typeof runApply === "function") {
-      console.log("[PB1][BOOT] runApply available");
-    } else {
-      console.error("[PB1][BOOT] runApply missing");
-    }
-  } catch (e) {
-    console.error("[PB1][BOOT] crash", e);
+  } finally {
+    setLoadingState("");
   }
 });
