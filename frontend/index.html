@@ -941,6 +941,7 @@
   </div>
 
 <script>
+console.log("[PB1][BOOT] script loaded", new Date().toISOString());
   // Tiny DOM helper (you removed this earlier)
   function $(id) {
     return document.getElementById(id);
@@ -3096,6 +3097,7 @@ async function loadReviews(){
         showError(String(e.message || e));
       }
     }
+    window.runApply = runApply; // expose globally
 
     // Auto-apply changes
     const debouncedWeekApply = debounce(() => runApply(), 300);
@@ -3226,7 +3228,7 @@ async function loadReviews(){
     setLoadingState("Loading metadata…");
     await runApply();
   } catch(e){
-    console.error(e);
+    console.error("[PB1][INIT] Error:", e);
     showError(String(e.message || e));
     setSubline({
       ok: false,
@@ -3235,4 +3237,18 @@ async function loadReviews(){
       viewingLabel: storeSelect?.value ? "Selected shop" : "All shops"
     });
   }
-})()
+})();
+
+// Safety net: force boot on DOMContentLoaded if init IIFE didn't run
+window.addEventListener("DOMContentLoaded", () => {
+  try {
+    console.log("[PB1][BOOT] DOMContentLoaded", document.readyState);
+    if (typeof runApply === "function") {
+      console.log("[PB1][BOOT] runApply available");
+    } else {
+      console.error("[PB1][BOOT] runApply missing");
+    }
+  } catch (e) {
+    console.error("[PB1][BOOT] crash", e);
+  }
+});
